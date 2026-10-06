@@ -20,4 +20,11 @@ class SocialUserInfoTest {
                 .isInstanceOf(InvalidSocialUserInfoException.class)
                 .hasMessageContaining("이메일");
     }
+
+    @Test
+    void rejectsGoogleProfileWithoutEmail() {
+        assertThatThrownBy(() -> SocialUserInfo.google("123", "파봄", null))
+                .isInstanceOf(InvalidSocialUserInfoException.class)
+                .hasMessageContaining("이메일");
+    }
 }

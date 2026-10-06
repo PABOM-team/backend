@@ -12,6 +12,11 @@ app:
     client-secret: ${KAKAO_CLIENT_SECRET:}
     redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/v1/auth/kakao/callback}
     state-cookie-secure: ${KAKAO_STATE_COOKIE_SECURE:false}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/v1/auth/google/callback}
+    state-cookie-secure: ${GOOGLE_STATE_COOKIE_SECURE:false}
 
 management:
   endpoints:
