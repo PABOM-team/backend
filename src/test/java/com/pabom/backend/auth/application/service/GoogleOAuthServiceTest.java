@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-import com.pabom.backend.auth.application.command.GoogleCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
 import com.pabom.backend.auth.application.port.GoogleOAuthClientPort;
-import com.pabom.backend.auth.application.result.GoogleAuthorizationResult;
-import com.pabom.backend.auth.application.result.GoogleLoginResult;
+import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
+import com.pabom.backend.auth.application.result.OAuthLoginResult;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class GoogleOAuthServiceTest {
                 .willAnswer(invocation -> "https://accounts.google.com/o/oauth2/v2/auth?state="
                         + invocation.getArgument(0, String.class));
 
-        GoogleAuthorizationResult result = googleOAuthService.issueAuthorizationUrl();
+        OAuthAuthorizationResult result = googleOAuthService.issueAuthorizationUrl();
 
         assertThat(result.state()).isNotBlank();
         assertThat(result.authorizationUrl()).endsWith(result.state());
@@ -41,8 +41,8 @@ class GoogleOAuthServiceTest {
         given(googleOAuthClient.authenticate("authorization-code"))
                 .willReturn(SocialUserInfo.google("123456", "파봄"));
 
-        GoogleLoginResult result = googleOAuthService.login(
-                new GoogleCallbackCommand("authorization-code", "state", "state")
+        OAuthLoginResult result = googleOAuthService.login(
+                new OAuthCallbackCommand("authorization-code", "state", "state")
         );
 
         assertThat(result.provider().name()).isEqualTo("GOOGLE");
@@ -52,7 +52,7 @@ class GoogleOAuthServiceTest {
 
     @Test
     void rejectsCallbackWhenStateDoesNotMatch() {
-        GoogleCallbackCommand command = new GoogleCallbackCommand(
+        OAuthCallbackCommand command = new OAuthCallbackCommand(
                 "authorization-code",
                 "expected-state",
                 "tampered-state"

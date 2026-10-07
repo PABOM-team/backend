@@ -1,6 +1,6 @@
 package com.pabom.backend.auth.application.command;
 
-public record GoogleCallbackCommand(
+public record OAuthCallbackCommand(
         String authorizationCode,
         String expectedState,
         String actualState
