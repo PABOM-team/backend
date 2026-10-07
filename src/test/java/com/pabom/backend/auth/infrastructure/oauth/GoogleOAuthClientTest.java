@@ -41,7 +41,8 @@ class GoogleOAuthClientTest {
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
                 .contains("response_type=code")
-                .contains("scope=openid%20profile%20email")
+                .contains("scope=openid%20profile")
+                .doesNotContain("email")
                 .contains("state=state-value");
     }
 
@@ -61,8 +62,7 @@ class GoogleOAuthClientTest {
                         """
                         {
                           "sub": "123456",
-                          "name": "파봄",
-                          "email": "pabom@example.com"
+                          "name": "파봄"
                         }
                         """,
                         MediaType.APPLICATION_JSON
@@ -73,7 +73,6 @@ class GoogleOAuthClientTest {
         assertThat(userInfo.provider().name()).isEqualTo("GOOGLE");
         assertThat(userInfo.providerId()).isEqualTo("123456");
         assertThat(userInfo.nickname()).isEqualTo("파봄");
-        assertThat(userInfo.email()).isEqualTo("pabom@example.com");
         server.verify();
     }
 }

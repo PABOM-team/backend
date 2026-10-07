@@ -9,8 +9,6 @@ public record GoogleLoginResponse(
         @Schema(description = "구글 회원 식별자", example = "1234567890")
         String providerId,
         @Schema(description = "구글 계정 이름", example = "파봄")
-        String nickname,
-        @Schema(description = "구글 계정 이메일", example = "pabom@example.com")
-        String email
+        String nickname
 ) {
 }

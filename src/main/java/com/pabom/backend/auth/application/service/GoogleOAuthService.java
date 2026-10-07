@@ -34,8 +34,7 @@ public class GoogleOAuthService {
         return new GoogleLoginResult(
                 userInfo.provider(),
                 userInfo.providerId(),
-                userInfo.nickname(),
-                userInfo.email()
+                userInfo.nickname()
         );
     }
 

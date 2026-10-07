@@ -15,13 +15,8 @@ public record KakaoUserInfoResponse(
                 : kakaoAccount.profile().nickname();
     }
 
-    public String email() {
-        return kakaoAccount == null ? null : kakaoAccount.email();
-    }
-
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record KakaoAccount(
-            String email,
             Profile profile
     ) {
     }

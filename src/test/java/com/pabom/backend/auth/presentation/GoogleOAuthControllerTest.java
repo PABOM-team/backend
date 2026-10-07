@@ -70,8 +70,7 @@ class GoogleOAuthControllerTest {
                 .willReturn(new GoogleLoginResult(
                         OAuthProvider.GOOGLE,
                         "123456",
-                        "파봄",
-                        "pabom@example.com"
+                        "파봄"
                 ));
 
         mockMvc.perform(get("/api/v1/auth/google/callback")
@@ -83,7 +82,7 @@ class GoogleOAuthControllerTest {
                 .andExpect(jsonPath("$.success.data.provider").value("GOOGLE"))
                 .andExpect(jsonPath("$.success.data.providerId").value("123456"))
                 .andExpect(jsonPath("$.success.data.nickname").value("파봄"))
-                .andExpect(jsonPath("$.success.data.email").value("pabom@example.com"))
+                .andExpect(jsonPath("$.success.data.email").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
     }
 

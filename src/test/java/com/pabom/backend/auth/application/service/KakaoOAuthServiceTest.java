@@ -39,7 +39,7 @@ class KakaoOAuthServiceTest {
     @Test
     void returnsKakaoUserInfoWhenStateMatches() {
         given(kakaoOAuthClient.authenticate("authorization-code"))
-                .willReturn(SocialUserInfo.kakao("123456", "파봄", "pabom@example.com"));
+                .willReturn(SocialUserInfo.kakao("123456", "파봄"));
 
         KakaoLoginResult result = kakaoOAuthService.login(
                 new KakaoCallbackCommand("authorization-code", "state", "state")
@@ -48,7 +48,6 @@ class KakaoOAuthServiceTest {
         assertThat(result.provider().name()).isEqualTo("KAKAO");
         assertThat(result.providerId()).isEqualTo("123456");
         assertThat(result.nickname()).isEqualTo("파봄");
-        assertThat(result.email()).isEqualTo("pabom@example.com");
     }
 
     @Test

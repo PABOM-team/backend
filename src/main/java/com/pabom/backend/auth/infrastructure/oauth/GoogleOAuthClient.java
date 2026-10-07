@@ -28,7 +28,7 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
     private static final String AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
-    private static final String REQUIRED_SCOPES = "openid profile email";
+    private static final String REQUIRED_SCOPES = "openid profile";
     private static final String CALLBACK_PATH = "/api/v1/auth/google/callback";
 
     private final RestTemplate restTemplate;
@@ -57,7 +57,7 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
             if (userInfo == null || !StringUtils.hasText(userInfo.sub())) {
                 throw new InvalidSocialUserInfoException("구글 회원 식별자가 없습니다.");
             }
-            return SocialUserInfo.google(userInfo.sub(), userInfo.name(), userInfo.email());
+            return SocialUserInfo.google(userInfo.sub(), userInfo.name());
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {

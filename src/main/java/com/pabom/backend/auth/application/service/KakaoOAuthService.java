@@ -34,8 +34,7 @@ public class KakaoOAuthService {
         return new KakaoLoginResult(
                 userInfo.provider(),
                 userInfo.providerId(),
-                userInfo.nickname(),
-                userInfo.email()
+                userInfo.nickname()
         );
     }
 
