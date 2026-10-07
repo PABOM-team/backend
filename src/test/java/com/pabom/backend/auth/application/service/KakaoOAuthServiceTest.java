@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-import com.pabom.backend.auth.application.command.KakaoCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
 import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
-import com.pabom.backend.auth.application.result.KakaoAuthorizationResult;
-import com.pabom.backend.auth.application.result.KakaoLoginResult;
+import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
+import com.pabom.backend.auth.application.result.OAuthLoginResult;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class KakaoOAuthServiceTest {
                 .willAnswer(invocation -> "https://kauth.kakao.com/oauth/authorize?state="
                         + invocation.getArgument(0, String.class));
 
-        KakaoAuthorizationResult result = kakaoOAuthService.issueAuthorizationUrl();
+        OAuthAuthorizationResult result = kakaoOAuthService.issueAuthorizationUrl();
 
         assertThat(result.state()).isNotBlank();
         assertThat(result.authorizationUrl()).endsWith(result.state());
@@ -41,8 +41,8 @@ class KakaoOAuthServiceTest {
         given(kakaoOAuthClient.authenticate("authorization-code"))
                 .willReturn(SocialUserInfo.kakao("123456", "파봄"));
 
-        KakaoLoginResult result = kakaoOAuthService.login(
-                new KakaoCallbackCommand("authorization-code", "state", "state")
+        OAuthLoginResult result = kakaoOAuthService.login(
+                new OAuthCallbackCommand("authorization-code", "state", "state")
         );
 
         assertThat(result.provider().name()).isEqualTo("KAKAO");
@@ -52,7 +52,7 @@ class KakaoOAuthServiceTest {
 
     @Test
     void rejectsCallbackWhenStateDoesNotMatch() {
-        KakaoCallbackCommand command = new KakaoCallbackCommand(
+        OAuthCallbackCommand command = new OAuthCallbackCommand(
                 "authorization-code",
                 "expected-state",
                 "tampered-state"

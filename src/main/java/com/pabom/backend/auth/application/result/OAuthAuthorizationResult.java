@@ -1,6 +1,6 @@
 package com.pabom.backend.auth.application.result;
 
-public record KakaoAuthorizationResult(
+public record OAuthAuthorizationResult(
         String authorizationUrl,
         String state
 ) {
