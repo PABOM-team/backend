@@ -28,7 +28,7 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
     private static final String AUTHORIZATION_URL = "https://kauth.kakao.com/oauth/authorize";
     private static final String TOKEN_URL = "https://kauth.kakao.com/oauth/token";
     private static final String USER_INFO_URL = "https://kapi.kakao.com/v2/user/me";
-    private static final String REQUIRED_SCOPES = "profile_nickname,account_email";
+    private static final String REQUIRED_SCOPES = "profile_nickname";
     private static final String CALLBACK_PATH = "/api/v1/auth/kakao/callback";
 
     private final RestTemplate restTemplate;
@@ -59,8 +59,7 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
             }
             return SocialUserInfo.kakao(
                     userInfo.id().toString(),
-                    userInfo.nickname(),
-                    userInfo.email()
+                    userInfo.nickname()
             );
         } catch (BusinessException exception) {
             throw exception;

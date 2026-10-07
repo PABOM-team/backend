@@ -26,8 +26,7 @@ public class KakaoOAuthPresentationMapper {
         return new KakaoLoginResponse(
                 result.provider().name(),
                 result.providerId(),
-                result.nickname(),
-                result.email()
+                result.nickname()
         );
     }
 }

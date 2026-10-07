@@ -9,8 +9,6 @@ public record KakaoLoginResponse(
         @Schema(description = "카카오 회원번호", example = "1234567890")
         String providerId,
         @Schema(description = "카카오 닉네임", example = "파봄")
-        String nickname,
-        @Schema(description = "카카오 계정 이메일", example = "pabom@example.com")
-        String email
+        String nickname
 ) {
 }

@@ -39,7 +39,7 @@ class GoogleOAuthServiceTest {
     @Test
     void returnsGoogleUserInfoWhenStateMatches() {
         given(googleOAuthClient.authenticate("authorization-code"))
-                .willReturn(SocialUserInfo.google("123456", "파봄", "pabom@example.com"));
+                .willReturn(SocialUserInfo.google("123456", "파봄"));
 
         GoogleLoginResult result = googleOAuthService.login(
                 new GoogleCallbackCommand("authorization-code", "state", "state")
@@ -48,7 +48,6 @@ class GoogleOAuthServiceTest {
         assertThat(result.provider().name()).isEqualTo("GOOGLE");
         assertThat(result.providerId()).isEqualTo("123456");
         assertThat(result.nickname()).isEqualTo("파봄");
-        assertThat(result.email()).isEqualTo("pabom@example.com");
     }
 
     @Test

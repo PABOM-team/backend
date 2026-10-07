@@ -9,22 +9,8 @@ class SocialUserInfoTest {
 
     @Test
     void rejectsKakaoProfileWithoutNickname() {
-        assertThatThrownBy(() -> SocialUserInfo.kakao("123", null, "pabom@example.com"))
+        assertThatThrownBy(() -> SocialUserInfo.kakao("123", null))
                 .isInstanceOf(InvalidSocialUserInfoException.class)
                 .hasMessageContaining("닉네임");
-    }
-
-    @Test
-    void rejectsKakaoProfileWithoutEmail() {
-        assertThatThrownBy(() -> SocialUserInfo.kakao("123", "파봄", null))
-                .isInstanceOf(InvalidSocialUserInfoException.class)
-                .hasMessageContaining("이메일");
-    }
-
-    @Test
-    void rejectsGoogleProfileWithoutEmail() {
-        assertThatThrownBy(() -> SocialUserInfo.google("123", "파봄", null))
-                .isInstanceOf(InvalidSocialUserInfoException.class)
-                .hasMessageContaining("이메일");
     }
 }

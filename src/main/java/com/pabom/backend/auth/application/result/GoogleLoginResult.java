@@ -5,7 +5,6 @@ import com.pabom.backend.auth.domain.model.OAuthProvider;
 public record GoogleLoginResult(
         OAuthProvider provider,
         String providerId,
-        String nickname,
-        String email
+        String nickname
 ) {
 }

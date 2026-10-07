@@ -26,8 +26,7 @@ public class GoogleOAuthPresentationMapper {
         return new GoogleLoginResponse(
                 result.provider().name(),
                 result.providerId(),
-                result.nickname(),
-                result.email()
+                result.nickname()
         );
     }
 }

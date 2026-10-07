@@ -41,7 +41,8 @@ class KakaoOAuthClientTest {
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
                 .contains("response_type=code")
-                .contains("scope=profile_nickname,account_email")
+                .contains("scope=profile_nickname")
+                .doesNotContain("account_email")
                 .contains("state=state-value");
     }
 
@@ -62,7 +63,6 @@ class KakaoOAuthClientTest {
                         {
                           "id": 123456,
                           "kakao_account": {
-                            "email": "pabom@example.com",
                             "profile": { "nickname": "파봄" }
                           }
                         }
@@ -74,7 +74,6 @@ class KakaoOAuthClientTest {
 
         assertThat(userInfo.providerId()).isEqualTo("123456");
         assertThat(userInfo.nickname()).isEqualTo("파봄");
-        assertThat(userInfo.email()).isEqualTo("pabom@example.com");
         server.verify();
     }
 }
