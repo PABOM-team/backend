@@ -35,7 +35,7 @@ public class GoogleOAuthService implements OAuthService {
     public OAuthLoginResult login(OAuthCallbackCommand command) {
         validateState(command.expectedState(), command.actualState());
         if (!StringUtils.hasText(command.authorizationCode())) {
-            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN);
+            throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
         }
 
         SocialUserInfo userInfo = googleOAuthClient.authenticate(command.authorizationCode());
@@ -48,7 +48,7 @@ public class GoogleOAuthService implements OAuthService {
 
     private void validateState(String expectedState, String actualState) {
         if (!StringUtils.hasText(expectedState) || !expectedState.equals(actualState)) {
-            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN);
+            throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.pabom.backend.global.error;
 
+import com.pabom.backend.auth.domain.error.AuthErrorCode;
+
 import com.pabom.backend.global.response.ApiResponseBody;
 import com.pabom.backend.global.response.ApiResponseBody.ErrorBody;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,7 +38,7 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException exception,
             HttpServletRequest request
     ) {
-        BaseErrorCode errorCode = GlobalErrorCode.MISSING_REQUIRED_VALUE;
+        BaseErrorCode errorCode = AuthErrorCode.VALIDATION_FAILED;
         ErrorBody error = new ErrorBody(
                 errorCode.getCode(),
                 errorCode.getMessage(),

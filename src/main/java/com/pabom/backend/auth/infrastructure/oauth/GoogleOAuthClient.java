@@ -19,6 +19,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -61,7 +63,7 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN, exception);
+            throw new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE, exception);
         }
     }
 
@@ -85,8 +87,10 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
                 throw new IllegalStateException("구글 토큰 응답에 Access Token이 없습니다.");
             }
             return response.accessToken();
-        } catch (RestClientResponseException exception) {
-            throw new IllegalStateException("구글 토큰 교환에 실패했습니다.", exception);
+        } catch (HttpClientErrorException exception) {
+            throw new BusinessException(AuthErrorCode.GOOGLE_CODE_INVALID, exception);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE, exception);
         }
     }
 
@@ -100,8 +104,8 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
                     new HttpEntity<>(headers),
                     GoogleUserInfoResponse.class
             ).getBody();
-        } catch (RestClientResponseException exception) {
-            throw new IllegalStateException("구글 사용자 정보 조회에 실패했습니다.", exception);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE, exception);
         }
     }
 

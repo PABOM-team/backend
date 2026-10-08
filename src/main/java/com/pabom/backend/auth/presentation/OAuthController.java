@@ -2,11 +2,14 @@ package com.pabom.backend.auth.presentation;
 
 import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
+import com.pabom.backend.auth.application.result.OAuthLoginCompletionResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
+import com.pabom.backend.auth.application.service.OAuthLoginCompletionService;
 import com.pabom.backend.auth.application.service.OAuthService;
 import com.pabom.backend.auth.application.service.OAuthServiceResolver;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.auth.presentation.docs.OAuthControllerDocs;
+import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
@@ -35,18 +38,24 @@ public class OAuthController implements OAuthControllerDocs {
     private static final Duration STATE_COOKIE_MAX_AGE = Duration.ofMinutes(5);
 
     private final OAuthServiceResolver serviceResolver;
+    private final OAuthLoginCompletionService loginCompletionService;
     private final OAuthPresentationMapper mapper;
+    private final RefreshTokenCookieManager refreshTokenCookieManager;
     private final boolean googleStateCookieSecure;
     private final boolean kakaoStateCookieSecure;
 
     public OAuthController(
             OAuthServiceResolver serviceResolver,
+            OAuthLoginCompletionService loginCompletionService,
             OAuthPresentationMapper mapper,
+            RefreshTokenCookieManager refreshTokenCookieManager,
             @Value("${app.google.state-cookie-secure:false}") boolean googleStateCookieSecure,
             @Value("${app.kakao.state-cookie-secure:false}") boolean kakaoStateCookieSecure
     ) {
         this.serviceResolver = serviceResolver;
+        this.loginCompletionService = loginCompletionService;
         this.mapper = mapper;
+        this.refreshTokenCookieManager = refreshTokenCookieManager;
         this.googleStateCookieSecure = googleStateCookieSecure;
         this.kakaoStateCookieSecure = kakaoStateCookieSecure;
     }
@@ -67,7 +76,7 @@ public class OAuthController implements OAuthControllerDocs {
 
     @Override
     @GetMapping("/callback")
-    public ResponseEntity<ApiResponseBody<OAuthLoginResponse>> callback(
+    public ResponseEntity<OAuthLoginResponse> callback(
             @PathVariable String provider,
             @RequestParam String code,
             @RequestParam String state,
@@ -77,9 +86,17 @@ public class OAuthController implements OAuthControllerDocs {
         OAuthService service = serviceResolver.resolve(provider);
         OAuthProvider oauthProvider = service.provider();
         OAuthCallbackCommand command = mapper.toCommand(code, findStateCookie(request, oauthProvider), state);
-        OAuthLoginResult result = service.login(command);
+        OAuthLoginResult socialLogin = service.login(command);
+        OAuthLoginCompletionResult result = loginCompletionService.complete(socialLogin);
         addStateCookie(response, oauthProvider, "", Duration.ZERO);
-        return ResponseEntity.ok(ApiResponseBody.success(mapper.toResponse(result), request));
+        if (result.refreshToken() != null) {
+            refreshTokenCookieManager.add(
+                    response,
+                    result.refreshToken(),
+                    result.refreshExpiresIn()
+            );
+        }
+        return ResponseEntity.ok(mapper.toResponse(result));
     }
 
     private String findStateCookie(HttpServletRequest request, OAuthProvider provider) {

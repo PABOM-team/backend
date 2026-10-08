@@ -1,19 +1,23 @@
 package com.pabom.backend.auth.infrastructure.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
@@ -74,5 +78,27 @@ class GoogleOAuthClientTest {
         assertThat(userInfo.providerId()).isEqualTo("123456");
         assertThat(userInfo.nickname()).isEqualTo("파봄");
         server.verify();
+    }
+
+    @Test
+    void mapsGoogleClientErrorToInvalidCode() {
+        server.expect(once(), requestTo("https://oauth2.googleapis.com/token"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> googleOAuthClient.authenticate("invalid-code"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("GOOGLE_CODE_INVALID"));
+    }
+
+    @Test
+    void mapsGoogleServerErrorToUnavailable() {
+        server.expect(once(), requestTo("https://oauth2.googleapis.com/token"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThatThrownBy(() -> googleOAuthClient.authenticate("authorization-code"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("GOOGLE_UNAVAILABLE"));
     }
 }

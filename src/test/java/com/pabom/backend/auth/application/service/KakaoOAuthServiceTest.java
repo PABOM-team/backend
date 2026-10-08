@@ -62,6 +62,6 @@ class KakaoOAuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode()
-                        .getCode()).isEqualTo("INVALID_SOCIAL_TOKEN"));
+                        .getCode()).isEqualTo("VALIDATION_FAILED"));
     }
 }

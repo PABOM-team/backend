@@ -15,9 +15,6 @@ public record SocialUserInfo(
         if (providerId == null || providerId.isBlank()) {
             throw new InvalidSocialUserInfoException("소셜 로그인 회원 식별자가 없습니다.");
         }
-        if (nickname == null || nickname.isBlank()) {
-            throw new InvalidSocialUserInfoException("소셜 로그인 닉네임이 없습니다. 동의 항목을 확인해 주세요.");
-        }
     }
 
     public static SocialUserInfo kakao(String providerId, String nickname) {
