@@ -19,6 +19,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -64,7 +66,7 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN, exception);
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
         }
     }
 
@@ -90,8 +92,10 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
                 throw new IllegalStateException("카카오 토큰 응답에 Access Token이 없습니다.");
             }
             return response.accessToken();
-        } catch (RestClientResponseException exception) {
-            throw new IllegalStateException("카카오 토큰 교환에 실패했습니다.", exception);
+        } catch (HttpClientErrorException exception) {
+            throw new BusinessException(AuthErrorCode.KAKAO_CODE_INVALID, exception);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
         }
     }
 
@@ -105,8 +109,8 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
                     new HttpEntity<>(headers),
                     KakaoUserInfoResponse.class
             ).getBody();
-        } catch (RestClientResponseException exception) {
-            throw new IllegalStateException("카카오 사용자 정보 조회에 실패했습니다.", exception);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
         }
     }
 

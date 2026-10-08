@@ -7,6 +7,11 @@ spring:
     open-in-view: false
 
 app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-secret-key-must-be-at-least-32-bytes}
+    access-expiration-seconds: 1800
+    signup-expiration-seconds: 600
+    refresh-expiration-seconds: 1209600
   kakao:
     client-id: ${KAKAO_CLIENT_ID:}
     client-secret: ${KAKAO_CLIENT_SECRET:}

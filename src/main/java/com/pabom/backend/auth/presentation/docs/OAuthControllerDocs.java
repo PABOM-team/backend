@@ -28,17 +28,25 @@ public interface OAuthControllerDocs {
             HttpServletResponse response
     );
 
-    @Operation(summary = "OAuth Callback", description = "provider의 state를 검증하고 사용자 정보를 조회합니다.")
+    @Operation(
+            summary = "OAuth Callback",
+            description = "OAuth 인증 후 PENDING_TERMS에는 Signup Token을, ACTIVE에는 Access/Refresh Token을 발급합니다."
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "OAuth 사용자 정보 조회 성공",
+                    description = "OAuth 로그인 성공",
                     content = @Content(schema = @Schema(implementation = OAuthLoginResponse.class))
             ),
-            @ApiResponse(responseCode = "400", description = "지원하지 않는 OAuth 제공자", content = @Content),
-            @ApiResponse(responseCode = "401", description = "인가 코드, state 또는 사용자 정보 오류", content = @Content)
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청값, Redirect URI 또는 Provider 인가 코드 오류",
+                    content = @Content
+            ),
+            @ApiResponse(responseCode = "429", description = "로그인 요청 제한 초과", content = @Content),
+            @ApiResponse(responseCode = "502", description = "OAuth Provider 통신 장애", content = @Content)
     })
-    ResponseEntity<ApiResponseBody<OAuthLoginResponse>> callback(
+    ResponseEntity<OAuthLoginResponse> callback(
             @Parameter(description = "OAuth 제공자", example = "google", required = true) String provider,
             String code,
             String state,
