@@ -10,9 +10,15 @@ public interface ServiceTokenPort {
 
     IssuedRefreshToken issueRefreshToken(Long userId, Instant issuedAt);
 
+    IssuedRefreshToken issueRefreshToken(Long userId, String familyId, Instant issuedAt);
+
     Long validateSignupToken(String token);
 
     Long validateAccessToken(String token);
+
+    Long validateRefreshToken(String token);
+
+    String hashRefreshToken(String token);
 
     record IssuedToken(String value, long expiresIn) {
     }

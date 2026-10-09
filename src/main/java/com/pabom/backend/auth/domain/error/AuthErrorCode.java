@@ -23,6 +23,26 @@ public enum AuthErrorCode implements BaseErrorCode {
             "INVALID_TOKEN",
             "유효하지 않거나 만료된 인증 토큰입니다."
     ),
+    REFRESH_INVALID(
+            HttpStatus.UNAUTHORIZED,
+            "REFRESH_INVALID",
+            "유효하지 않거나 만료된 리프레시 토큰입니다."
+    ),
+    REFRESH_REUSED(
+            HttpStatus.UNAUTHORIZED,
+            "REFRESH_REUSED",
+            "이미 사용된 리프레시 토큰입니다."
+    ),
+    USER_WITHDRAWN(
+            HttpStatus.FORBIDDEN,
+            "USER_WITHDRAWN",
+            "탈퇴한 사용자입니다."
+    ),
+    ORIGIN_NOT_ALLOWED(
+            HttpStatus.FORBIDDEN,
+            "ORIGIN_NOT_ALLOWED",
+            "허용되지 않은 Origin입니다."
+    ),
     VALIDATION_FAILED(
             HttpStatus.BAD_REQUEST,
             "VALIDATION_FAILED",

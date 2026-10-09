@@ -15,12 +15,14 @@ import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginCompletionResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
 import com.pabom.backend.auth.application.service.OAuthLoginCompletionService;
+import com.pabom.backend.auth.application.service.AuthSessionService;
 import com.pabom.backend.auth.application.service.OAuthService;
 import com.pabom.backend.auth.application.service.OAuthServiceResolver;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
+import com.pabom.backend.auth.infrastructure.config.AuthWebProperties;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.error.GlobalExceptionHandler;
 import jakarta.servlet.http.Cookie;
@@ -31,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import java.util.List;
 
 class OAuthControllerTest {
 
@@ -38,6 +41,7 @@ class OAuthControllerTest {
     private OAuthService googleOAuthService;
     private OAuthService kakaoOAuthService;
     private OAuthLoginCompletionService loginCompletionService;
+    private AuthSessionService authSessionService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -46,6 +50,7 @@ class OAuthControllerTest {
         googleOAuthService = mock(OAuthService.class);
         kakaoOAuthService = mock(OAuthService.class);
         loginCompletionService = mock(OAuthLoginCompletionService.class);
+        authSessionService = mock(AuthSessionService.class);
         given(serviceResolver.resolve("google")).willReturn(googleOAuthService);
         given(serviceResolver.resolve("kakao")).willReturn(kakaoOAuthService);
         given(serviceResolver.resolve("naver"))
@@ -53,11 +58,12 @@ class OAuthControllerTest {
         given(googleOAuthService.provider()).willReturn(OAuthProvider.GOOGLE);
         given(kakaoOAuthService.provider()).willReturn(OAuthProvider.KAKAO);
 
-        OAuthController controller = new OAuthController(
+        AuthController controller = new AuthController(
                 serviceResolver,
                 loginCompletionService,
+                authSessionService,
                 new OAuthPresentationMapper(),
-                new RefreshTokenCookieManager(),
+                new RefreshTokenCookieManager(new AuthWebProperties(List.of(), true, "Lax")),
                 false,
                 false
         );

@@ -4,15 +4,18 @@ import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginCompletionResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
+import com.pabom.backend.auth.application.result.TokenRefreshResult;
+import com.pabom.backend.auth.application.service.AuthSessionService;
 import com.pabom.backend.auth.application.service.OAuthLoginCompletionService;
 import com.pabom.backend.auth.application.service.OAuthService;
 import com.pabom.backend.auth.application.service.OAuthServiceResolver;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
-import com.pabom.backend.auth.presentation.docs.OAuthControllerDocs;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
+import com.pabom.backend.auth.presentation.docs.AuthControllerDocs;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
+import com.pabom.backend.auth.presentation.response.TokenRefreshResponse;
 import com.pabom.backend.global.response.ApiResponseBody;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.Cookie;
@@ -22,31 +25,36 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/auth/{provider}")
-public class OAuthController implements OAuthControllerDocs {
+@RequestMapping("/api/v1/auth")
+public class AuthController implements AuthControllerDocs {
 
     private static final Duration STATE_COOKIE_MAX_AGE = Duration.ofMinutes(5);
 
     private final OAuthServiceResolver serviceResolver;
     private final OAuthLoginCompletionService loginCompletionService;
+    private final AuthSessionService authSessionService;
     private final OAuthPresentationMapper mapper;
     private final RefreshTokenCookieManager refreshTokenCookieManager;
     private final boolean googleStateCookieSecure;
     private final boolean kakaoStateCookieSecure;
 
-    public OAuthController(
+    public AuthController(
             OAuthServiceResolver serviceResolver,
             OAuthLoginCompletionService loginCompletionService,
+            AuthSessionService authSessionService,
             OAuthPresentationMapper mapper,
             RefreshTokenCookieManager refreshTokenCookieManager,
             @Value("${app.google.state-cookie-secure:false}") boolean googleStateCookieSecure,
@@ -54,6 +62,7 @@ public class OAuthController implements OAuthControllerDocs {
     ) {
         this.serviceResolver = serviceResolver;
         this.loginCompletionService = loginCompletionService;
+        this.authSessionService = authSessionService;
         this.mapper = mapper;
         this.refreshTokenCookieManager = refreshTokenCookieManager;
         this.googleStateCookieSecure = googleStateCookieSecure;
@@ -61,7 +70,7 @@ public class OAuthController implements OAuthControllerDocs {
     }
 
     @Override
-    @GetMapping("/login-url")
+    @GetMapping("/{provider}/login-url")
     public ResponseEntity<ApiResponseBody<OAuthAuthorizationUrlResponse>> issueAuthorizationUrl(
             @PathVariable String provider,
             @Parameter(hidden = true) HttpServletRequest request,
@@ -75,7 +84,7 @@ public class OAuthController implements OAuthControllerDocs {
     }
 
     @Override
-    @GetMapping("/callback")
+    @GetMapping("/{provider}/callback")
     public ResponseEntity<OAuthLoginResponse> callback(
             @PathVariable String provider,
             @RequestParam String code,
@@ -97,6 +106,39 @@ public class OAuthController implements OAuthControllerDocs {
             );
         }
         return ResponseEntity.ok(mapper.toResponse(result));
+    }
+
+    @Override
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenRefreshResponse> refresh(
+            @CookieValue(name = RefreshTokenCookieManager.COOKIE_NAME, required = false)
+            String refreshToken,
+            HttpServletResponse response
+    ) {
+        TokenRefreshResult result = authSessionService.refresh(refreshToken);
+        refreshTokenCookieManager.add(
+                response,
+                result.refreshToken(),
+                result.refreshExpiresIn()
+        );
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(new TokenRefreshResponse(result.accessToken(), result.expiresIn()));
+    }
+
+    @Override
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = RefreshTokenCookieManager.COOKIE_NAME, required = false)
+            String refreshToken,
+            HttpServletResponse response
+    ) {
+        try {
+            authSessionService.logout(refreshToken);
+        } finally {
+            refreshTokenCookieManager.clear(response);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     private String findStateCookie(HttpServletRequest request, OAuthProvider provider) {
