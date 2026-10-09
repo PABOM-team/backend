@@ -10,6 +10,10 @@ public interface ServiceTokenPort {
 
     IssuedRefreshToken issueRefreshToken(Long userId, Instant issuedAt);
 
+    Long validateSignupToken(String token);
+
+    Long validateAccessToken(String token);
+
     record IssuedToken(String value, long expiresIn) {
     }
 

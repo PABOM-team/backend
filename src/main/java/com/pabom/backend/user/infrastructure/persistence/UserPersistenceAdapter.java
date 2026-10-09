@@ -22,6 +22,11 @@ public class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findById(Long id) {
+        return userJpaRepository.findById(id);
+    }
+
+    @Override
     public User save(User user) {
         return userJpaRepository.save(user);
     }
