@@ -2,6 +2,7 @@ package com.pabom.backend.health;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -31,13 +32,19 @@ public class HealthController {
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "서비스 정상",
-                    content = @Content(schema = @Schema(implementation = HealthResponse.class))
+                    description = "서비스 정상: status=UP",
+                    content = @Content(
+                            schema = @Schema(implementation = HealthResponse.class),
+                            examples = @ExampleObject(value = "{\"status\":\"UP\"}")
+                    )
             ),
             @ApiResponse(
                     responseCode = "503",
-                    description = "서비스 또는 필수 의존성 비정상",
-                    content = @Content(schema = @Schema(implementation = HealthResponse.class))
+                    description = "서비스 또는 필수 의존성 비정상: status=DOWN",
+                    content = @Content(
+                            schema = @Schema(implementation = HealthResponse.class),
+                            examples = @ExampleObject(value = "{\"status\":\"DOWN\"}")
+                    )
             )
     })
     @GetMapping("/health")

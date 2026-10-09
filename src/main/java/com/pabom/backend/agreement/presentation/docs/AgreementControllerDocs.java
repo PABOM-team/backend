@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,11 +23,31 @@ public interface AgreementControllerDocs {
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION)
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "회원가입 완료"),
-            @ApiResponse(responseCode = "400", description = "요청값 검증 실패", content = @Content),
-            @ApiResponse(responseCode = "401", description = "유효하지 않은 Signup Token", content = @Content),
-            @ApiResponse(responseCode = "409", description = "약관 버전 불일치", content = @Content),
-            @ApiResponse(responseCode = "422", description = "필수 약관 미동의", content = @Content)
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "회원가입 완료 및 Access Token 발급 성공",
+                    content = @Content(schema = @Schema(implementation = AgreementCompletionResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "VALIDATION_FAILED: 요청값 검증 실패",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "INVALID_TOKEN: Signup Token 누락, 만료 또는 위조",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "AGREEMENT_VERSION_MISMATCH: 약관 버전 불일치",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "422",
+                    description = "REQUIRED_AGREEMENT_MISSING: 필수 약관 미동의",
+                    content = @Content
+            )
     })
     ResponseEntity<AgreementCompletionResponse> complete(
             @Parameter(hidden = true)
