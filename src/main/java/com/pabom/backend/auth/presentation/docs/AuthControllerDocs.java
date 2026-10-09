@@ -22,11 +22,21 @@ public interface AuthControllerDocs {
 
     @Operation(summary = "OAuth 로그인 URL 발급", description = "provider에 해당하는 로그인 URL과 CSRF 방지용 state 쿠키를 발급합니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인 URL 발급 성공"),
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "로그인 URL 발급 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "로그인 URL 발급 성공", value = AUTH_URL_SUCCESS_EXAMPLE)
+                    )
+            ),
             @ApiResponse(
                     responseCode = "400",
                     description = "UNSUPPORTED_OAUTH_PROVIDER: 지원하지 않는 OAuth 제공자",
-                    content = @Content
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "지원하지 않는 Provider", value = UNSUPPORTED_PROVIDER_EXAMPLE)
+                    )
             )
     })
     ResponseEntity<ApiResponseBody<OAuthAuthorizationUrlResponse>> issueAuthorizationUrl(
@@ -43,23 +53,45 @@ public interface AuthControllerDocs {
             @ApiResponse(
                     responseCode = "200",
                     description = "OAuth 로그인 성공",
-                    content = @Content(schema = @Schema(implementation = OAuthLoginResponse.class))
+                    content = @Content(
+                            schema = @Schema(implementation = OAuthLoginResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "신규 사용자", value = OAUTH_SIGNUP_SUCCESS_EXAMPLE),
+                                    @ExampleObject(name = "기존 사용자", value = OAUTH_ACCESS_SUCCESS_EXAMPLE)
+                            }
+                    )
             ),
             @ApiResponse(
                     responseCode = "400",
                     description = "VALIDATION_FAILED, KAKAO_CODE_INVALID, GOOGLE_CODE_INVALID",
-                    content = @Content
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "유효하지 않은 인가 코드", value = OAUTH_CODE_INVALID_EXAMPLE)
+                    )
             ),
             @ApiResponse(
                     responseCode = "401",
                     description = "INVALID_SOCIAL_TOKEN: 유효하지 않은 소셜 인증 정보",
-                    content = @Content
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "유효하지 않은 소셜 토큰", value = INVALID_SOCIAL_TOKEN_EXAMPLE)
+                    )
             ),
-            @ApiResponse(responseCode = "429", description = "로그인 요청 제한 초과", content = @Content),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "RATE_LIMITED: 로그인 요청 제한 초과",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "요청 제한 초과", value = RATE_LIMITED_EXAMPLE)
+                    )
+            ),
             @ApiResponse(
                     responseCode = "502",
                     description = "KAKAO_UNAVAILABLE, GOOGLE_UNAVAILABLE: OAuth Provider 통신 장애",
-                    content = @Content
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(name = "OAuth Provider 장애", value = OAUTH_UNAVAILABLE_EXAMPLE)
+                    )
             )
     })
     ResponseEntity<OAuthLoginResponse> callback(
@@ -161,6 +193,128 @@ public interface AuthControllerDocs {
             @Parameter(hidden = true) String refreshToken,
             @Parameter(hidden = true) HttpServletResponse response
     );
+
+    String AUTH_URL_SUCCESS_EXAMPLE = """
+            {
+              "resultType": "SUCCESS",
+              "success": {
+                "data": {
+                  "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=..."
+                }
+              },
+              "error": null,
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/google/login-url"
+              }
+            }
+            """;
+
+    String UNSUPPORTED_PROVIDER_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "UNSUPPORTED_OAUTH_PROVIDER",
+                "message": "지원하지 않는 OAuth 제공자입니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/naver/login-url"
+              }
+            }
+            """;
+
+    String OAUTH_SIGNUP_SUCCESS_EXAMPLE = """
+            {
+              "signupToken": "eyJhbGciOi...",
+              "expiresIn": 600,
+              "isNewUser": true,
+              "user": {
+                "id": 1,
+                "nickname": "파봄 사용자1234",
+                "status": "PENDING_TERMS"
+              }
+            }
+            """;
+
+    String OAUTH_ACCESS_SUCCESS_EXAMPLE = """
+            {
+              "accessToken": "eyJhbGciOi...",
+              "expiresIn": 1800,
+              "isNewUser": false,
+              "user": {
+                "id": 1,
+                "nickname": "파봄",
+                "status": "ACTIVE"
+              }
+            }
+            """;
+
+    String OAUTH_CODE_INVALID_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "GOOGLE_CODE_INVALID",
+                "message": "Google 인가 코드가 만료되었거나 유효하지 않습니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/google/callback"
+              }
+            }
+            """;
+
+    String INVALID_SOCIAL_TOKEN_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "INVALID_SOCIAL_TOKEN",
+                "message": "유효하지 않은 소셜 토큰입니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/google/callback"
+              }
+            }
+            """;
+
+    String RATE_LIMITED_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "RATE_LIMITED",
+                "message": "로그인 요청 제한을 초과했습니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/google/callback"
+              }
+            }
+            """;
+
+    String OAUTH_UNAVAILABLE_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "GOOGLE_UNAVAILABLE",
+                "message": "Google OAuth 서버와 통신할 수 없습니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/google/callback"
+              }
+            }
+            """;
 
     String REFRESH_SUCCESS_EXAMPLE = """
             {
