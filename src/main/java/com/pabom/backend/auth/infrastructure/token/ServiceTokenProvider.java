@@ -36,12 +36,20 @@ public class ServiceTokenProvider implements ServiceTokenPort {
 
     @Override
     public IssuedRefreshToken issueRefreshToken(Long userId, Instant issuedAt) {
+        return issueRefreshToken(userId, UUID.randomUUID().toString(), issuedAt);
+    }
+
+    @Override
+    public IssuedRefreshToken issueRefreshToken(
+            Long userId,
+            String familyId,
+            Instant issuedAt
+    ) {
         Instant expiresAt = issuedAt.plusSeconds(properties.refreshExpirationSeconds());
-        String familyId = UUID.randomUUID().toString();
         String token = jwtFactory.create(userId, TokenType.REFRESH, issuedAt, expiresAt);
         return new IssuedRefreshToken(
                 token,
-                hash(token),
+                hashRefreshToken(token),
                 familyId,
                 issuedAt,
                 expiresAt,
@@ -57,6 +65,23 @@ public class ServiceTokenProvider implements ServiceTokenPort {
     @Override
     public Long validateAccessToken(String token) {
         return validate(token, TokenType.ACCESS);
+    }
+
+    @Override
+    public Long validateRefreshToken(String token) {
+        try {
+            return validateAndGetUserId(token, TokenType.REFRESH);
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new BusinessException(AuthErrorCode.REFRESH_INVALID, exception);
+        }
+    }
+
+    @Override
+    public String hashRefreshToken(String token) {
+        if (token == null) {
+            throw new BusinessException(AuthErrorCode.REFRESH_INVALID);
+        }
+        return hash(token);
     }
 
     private Long validate(String token, TokenType expectedType) {

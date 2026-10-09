@@ -87,6 +87,15 @@ public class User {
         this.updatedAt = activatedAt;
     }
 
+    public boolean isWithdrawn() {
+        return status == UserStatus.WITHDRAWN;
+    }
+
+    public void withdraw(Instant withdrawnAt) {
+        this.status = UserStatus.WITHDRAWN;
+        this.updatedAt = withdrawnAt;
+    }
+
     public Long getId() {
         return id;
     }

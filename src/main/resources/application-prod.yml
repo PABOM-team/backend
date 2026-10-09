@@ -6,3 +6,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+app:
+  auth:
+    refresh-cookie-secure: true

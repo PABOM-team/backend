@@ -21,6 +21,7 @@ import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
+import com.pabom.backend.auth.infrastructure.config.AuthWebProperties;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.error.GlobalExceptionHandler;
 import jakarta.servlet.http.Cookie;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import java.util.List;
 
 class OAuthControllerTest {
 
@@ -57,7 +59,7 @@ class OAuthControllerTest {
                 serviceResolver,
                 loginCompletionService,
                 new OAuthPresentationMapper(),
-                new RefreshTokenCookieManager(),
+                new RefreshTokenCookieManager(new AuthWebProperties(List.of(), true, "Lax")),
                 false,
                 false
         );
