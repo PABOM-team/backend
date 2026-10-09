@@ -10,13 +10,13 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
-    public static final String BEARER_AUTH = "bearerAuth";
+    public static final String AUTHORIZATION = "Authorization";
 
     @Bean
     public OpenAPI pabomOpenAPI() {
         return new OpenAPI()
                 .components(new Components().addSecuritySchemes(
-                        BEARER_AUTH,
+                        AUTHORIZATION,
                         new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
