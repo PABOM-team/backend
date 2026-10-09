@@ -15,6 +15,7 @@ import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginCompletionResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
 import com.pabom.backend.auth.application.service.OAuthLoginCompletionService;
+import com.pabom.backend.auth.application.service.AuthSessionService;
 import com.pabom.backend.auth.application.service.OAuthService;
 import com.pabom.backend.auth.application.service.OAuthServiceResolver;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
@@ -40,6 +41,7 @@ class OAuthControllerTest {
     private OAuthService googleOAuthService;
     private OAuthService kakaoOAuthService;
     private OAuthLoginCompletionService loginCompletionService;
+    private AuthSessionService authSessionService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -48,6 +50,7 @@ class OAuthControllerTest {
         googleOAuthService = mock(OAuthService.class);
         kakaoOAuthService = mock(OAuthService.class);
         loginCompletionService = mock(OAuthLoginCompletionService.class);
+        authSessionService = mock(AuthSessionService.class);
         given(serviceResolver.resolve("google")).willReturn(googleOAuthService);
         given(serviceResolver.resolve("kakao")).willReturn(kakaoOAuthService);
         given(serviceResolver.resolve("naver"))
@@ -55,9 +58,10 @@ class OAuthControllerTest {
         given(googleOAuthService.provider()).willReturn(OAuthProvider.GOOGLE);
         given(kakaoOAuthService.provider()).willReturn(OAuthProvider.KAKAO);
 
-        OAuthController controller = new OAuthController(
+        AuthController controller = new AuthController(
                 serviceResolver,
                 loginCompletionService,
+                authSessionService,
                 new OAuthPresentationMapper(),
                 new RefreshTokenCookieManager(new AuthWebProperties(List.of(), true, "Lax")),
                 false,
