@@ -66,6 +66,7 @@ class AuthSessionControllerIntegrationTest {
     @Test
     void logoutAlwaysReturnsNoContentAndClearsCookie() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:8080")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer malformed-token"))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""))
