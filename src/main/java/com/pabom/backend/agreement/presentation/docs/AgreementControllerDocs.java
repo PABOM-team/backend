@@ -19,7 +19,7 @@ public interface AgreementControllerDocs {
     @Operation(
             summary = "회원가입 약관 동의 완료",
             description = "Signup Token으로 필수 약관 동의를 저장하고 Access Token을 발급합니다.",
-            security = @SecurityRequirement(name = SwaggerConfig.SIGNUP_BEARER_AUTH)
+            security = @SecurityRequirement(name = SwaggerConfig.BEARER_AUTH)
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "회원가입 완료"),

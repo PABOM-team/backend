@@ -10,18 +10,18 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SwaggerConfig {
 
-    public static final String SIGNUP_BEARER_AUTH = "signupBearerAuth";
+    public static final String BEARER_AUTH = "bearerAuth";
 
     @Bean
     public OpenAPI pabomOpenAPI() {
         return new OpenAPI()
                 .components(new Components().addSecuritySchemes(
-                        SIGNUP_BEARER_AUTH,
+                        BEARER_AUTH,
                         new SecurityScheme()
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")
-                                .description("소셜 로그인 응답의 signupToken 원문을 입력하세요.")
+                                .description("Bearer 접두사 없이 JWT 토큰 원문을 입력하세요.")
                 ))
                 .info(new Info()
                         .title("Pabom API")
