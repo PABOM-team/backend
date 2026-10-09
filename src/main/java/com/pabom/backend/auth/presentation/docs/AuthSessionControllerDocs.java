@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Auth Session", description = "인증 세션 갱신 및 로그아웃 API")
+@Tag(name = "Auth", description = "OAuth 로그인 및 인증 세션 관리 API")
 public interface AuthSessionControllerDocs {
 
     @Operation(summary = "Access Token 재발급")

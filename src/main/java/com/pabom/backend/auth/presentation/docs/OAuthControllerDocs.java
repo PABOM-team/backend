@@ -14,7 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "OAuth", description = "Google과 Kakao OAuth 연동을 확인하는 API")
+@Tag(name = "Auth", description = "OAuth 로그인 및 인증 세션 관리 API")
 public interface OAuthControllerDocs {
 
     @Operation(summary = "OAuth 로그인 URL 발급", description = "provider에 해당하는 로그인 URL과 CSRF 방지용 state 쿠키를 발급합니다.")
