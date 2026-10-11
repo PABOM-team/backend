@@ -6,3 +6,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  flyway:
+    baseline-on-migrate: false
+
+app:
+  auth:
+    refresh-cookie-secure: true
