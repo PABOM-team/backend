@@ -1,4 +1,4 @@
-name: CI
+name: CI and DEV Deploy
 
 on:
   push:
@@ -16,49 +16,258 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  develop-branch-name:
+    name: Check develop PR branch name
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate develop pull request branch name
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          pattern='^(feat|fix|refactor|chore|docs|test|hotfix|release)/pabom-[0-9]+$'
+          if [[ ! "$BRANCH_NAME" =~ $pattern ]]; then
+            echo "::error::Invalid branch name: $BRANCH_NAME"
+            echo "Expected format: chore/pabom-8"
+            exit 1
+          fi
+
+  main-branch-name:
+    name: Check main PR source branch
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require develop as the source branch
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          if [ "$BRANCH_NAME" != "develop" ]; then
+            echo "::error::main pull requests must be opened from develop."
+            exit 1
+          fi
+
+  build:
+    name: Build and validate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ci-build-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
 
     # CI에서만 사용하는 일회성 MySQL 접속 정보다.
     env:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ci
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_NAME: pabom_ci
       DB_USERNAME: pabom_ci
-      DB_PASSWORD: ci_password
+      DB_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
 
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: ci_root_password
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
           MYSQL_DATABASE: pabom_ci
           MYSQL_USER: pabom_ci
-          MYSQL_PASSWORD: ci_password
+          MYSQL_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
 
     steps:
-      - name: 소스 코드 가져오기
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Java 21 설정
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Gradle 설정
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Gradle Wrapper 실행 권한 설정
+      - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: 빌드 및 테스트
-        run: ./gradlew clean build
+      - name: Verify CI MySQL service
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Spring profile: $SPRING_PROFILES_ACTIVE"
+          echo "JDBC target: mysql://$DB_HOST:$DB_PORT/$DB_NAME"
+          docker inspect --format='{{.State.Health.Status}}' '${{ job.services.mysql.id }}' | grep -Fx healthy
+
+      - name: 1. Compile source
+        run: ./gradlew clean compileJava --no-daemon
+
+      - name: 2. Run automated tests
+        run: ./gradlew test --no-daemon
+
+      - name: 3. Build executable JAR and verify Flyway migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew bootJar --no-daemon
+          test -f build/libs/app.jar
+          migration_count="$(jar tf build/libs/app.jar | grep -Ec '^BOOT-INF/classes/db/migration/V[^/]+__[^/]+\.sql$' || true)"
+          if [ "$migration_count" -eq 0 ]; then
+            echo "::error::No versioned Flyway migration was packaged in app.jar."
+            exit 1
+          fi
+          echo "Verified $migration_count Flyway migration file(s) in app.jar."
+
+      - name: 4. Validate application startup and migrations on MySQL 8.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="build/mysql-startup-check.log"
+          java -jar build/libs/app.jar --server.port=18080 > "$log_file" 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/api/v1/health > /dev/null; then
+              echo "Application started successfully after Flyway migration and JPA validation."
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "::error::Application exited during the MySQL migration check."
+              cat "$log_file"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "::error::Application did not become healthy within 120 seconds."
+          cat "$log_file"
+          exit 1
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports-${{ github.sha }}
+          path: |
+            build/reports/tests/test/
+            build/test-results/test/
+            build/mysql-startup-check.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload DEV deployment artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pabom-dev-${{ github.sha }}
+          path: build/libs/app.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-dev:
+    name: Deploy DEV
+    needs: build
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      vars.DEV_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      DEV_EC2_SSH_PORT: ${{ vars.DEV_EC2_SSH_PORT || '22' }}
+
+    steps:
+      - name: Checkout deployment files
+        uses: actions/checkout@v4
+
+      - name: Download application JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: pabom-dev-${{ github.sha }}
+          path: build/libs
+
+      - name: Validate deployment configuration
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+          DEV_EC2_SSH_PRIVATE_KEY: ${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}
+          DEV_EC2_KNOWN_HOSTS: ${{ secrets.DEV_EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in DEV_EC2_HOST DEV_EC2_USER DEV_EC2_SSH_PRIVATE_KEY DEV_EC2_KNOWN_HOSTS; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured."
+              exit 1
+            fi
+          done
+
+      - name: Prepare SSH
+        env:
+          DEV_EC2_SSH_PRIVATE_KEY: ${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}
+          DEV_EC2_KNOWN_HOSTS: ${{ secrets.DEV_EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEV_EC2_SSH_PRIVATE_KEY" > ~/.ssh/pabom_dev
+          printf '%s\n' "$DEV_EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/pabom_dev ~/.ssh/known_hosts
+
+      - name: Copy deployment bundle to EC2
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          set -euo pipefail
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "mkdir -p '$remote_dir' && chmod 700 '$remote_dir'"
+          sha256sum build/libs/app.jar | awk '{print $1}' > app.jar.sha256
+          scp -i ~/.ssh/pabom_dev -P "$DEV_EC2_SSH_PORT" \
+            build/libs/app.jar \
+            app.jar.sha256 \
+            deploy/deploy-dev.sh \
+            deploy/pabom-dev.service \
+            "$DEV_EC2_USER@$DEV_EC2_HOST:$remote_dir/"
+
+      - name: Deploy and verify DEV
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          set -euo pipefail
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "chmod 700 '$remote_dir/deploy-dev.sh' && sudo '$remote_dir/deploy-dev.sh' '$remote_dir/app.jar' '$remote_dir/app.jar.sha256' '$remote_dir/pabom-dev.service'"
+
+      - name: Remove remote deployment bundle
+        if: always()
+        continue-on-error: true
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "rm -f '$remote_dir/app.jar' '$remote_dir/app.jar.sha256' '$remote_dir/deploy-dev.sh' '$remote_dir/pabom-dev.service'; rmdir '$remote_dir' 2>/dev/null || true"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/pabom_dev

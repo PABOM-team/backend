@@ -9,3 +9,10 @@ spring:
       ddl-auto: create-drop
   flyway:
     enabled: false
+
+app:
+  jwt:
+    secret: test-only-secret-key-at-least-32-bytes
+  aws:
+    s3:
+      bucket: pabom-test
