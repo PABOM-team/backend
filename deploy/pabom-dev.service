@@ -1,0 +1,28 @@
+[Unit]
+Description=Pabom Spring Boot DEV
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pabom
+Group=pabom
+WorkingDirectory=/opt/pabom
+EnvironmentFile=/etc/pabom/pabom-dev.env
+Environment="JAVA_TOOL_OPTIONS=-XX:InitialRAMPercentage=10.0 -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError"
+ExecStart=/usr/bin/java -jar /opt/pabom/app.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=40s
+MemoryHigh=600M
+MemoryMax=700M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/pabom
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

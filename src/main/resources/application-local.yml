@@ -10,3 +10,10 @@ spring:
       ddl-auto: validate
   flyway:
     baseline-on-migrate: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:local-development-secret-key-must-be-at-least-32-bytes}
+  aws:
+    s3:
+      bucket: ${S3_BUCKET:pabom-local}

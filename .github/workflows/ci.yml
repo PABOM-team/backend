@@ -1,4 +1,4 @@
-name: CI
+name: CI and DEV Deploy
 
 on:
   push:
@@ -61,4 +61,111 @@ jobs:
         run: chmod +x gradlew
 
       - name: 빌드 및 테스트
-        run: ./gradlew clean build
+        run: ./gradlew clean build --no-daemon
+
+      - name: Upload DEV deployment artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pabom-dev-${{ github.sha }}
+          path: build/libs/app.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-dev:
+    name: Deploy DEV
+    needs: build
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/develop' &&
+      vars.DEV_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      DEV_EC2_SSH_PORT: ${{ vars.DEV_EC2_SSH_PORT || '22' }}
+
+    steps:
+      - name: Checkout deployment files
+        uses: actions/checkout@v4
+
+      - name: Download application JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: pabom-dev-${{ github.sha }}
+          path: build/libs
+
+      - name: Validate deployment configuration
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+          DEV_EC2_SSH_PRIVATE_KEY: ${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}
+          DEV_EC2_KNOWN_HOSTS: ${{ secrets.DEV_EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in DEV_EC2_HOST DEV_EC2_USER DEV_EC2_SSH_PRIVATE_KEY DEV_EC2_KNOWN_HOSTS; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured."
+              exit 1
+            fi
+          done
+
+      - name: Prepare SSH
+        env:
+          DEV_EC2_SSH_PRIVATE_KEY: ${{ secrets.DEV_EC2_SSH_PRIVATE_KEY }}
+          DEV_EC2_KNOWN_HOSTS: ${{ secrets.DEV_EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEV_EC2_SSH_PRIVATE_KEY" > ~/.ssh/pabom_dev
+          printf '%s\n' "$DEV_EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/pabom_dev ~/.ssh/known_hosts
+
+      - name: Copy deployment bundle to EC2
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          set -euo pipefail
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "mkdir -p '$remote_dir' && chmod 700 '$remote_dir'"
+          sha256sum build/libs/app.jar | awk '{print $1}' > app.jar.sha256
+          scp -i ~/.ssh/pabom_dev -P "$DEV_EC2_SSH_PORT" \
+            build/libs/app.jar \
+            app.jar.sha256 \
+            deploy/deploy-dev.sh \
+            deploy/pabom-dev.service \
+            "$DEV_EC2_USER@$DEV_EC2_HOST:$remote_dir/"
+
+      - name: Deploy and verify DEV
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          set -euo pipefail
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "chmod 700 '$remote_dir/deploy-dev.sh' && sudo '$remote_dir/deploy-dev.sh' '$remote_dir/app.jar' '$remote_dir/app.jar.sha256' '$remote_dir/pabom-dev.service'"
+
+      - name: Remove remote deployment bundle
+        if: always()
+        continue-on-error: true
+        env:
+          DEV_EC2_HOST: ${{ secrets.DEV_EC2_HOST }}
+          DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}
+        run: |
+          remote_dir="/tmp/pabom-deploy-${GITHUB_SHA}"
+          ssh -i ~/.ssh/pabom_dev -p "$DEV_EC2_SSH_PORT" \
+            "$DEV_EC2_USER@$DEV_EC2_HOST" \
+            "rm -f '$remote_dir/app.jar' '$remote_dir/app.jar.sha256' '$remote_dir/deploy-dev.sh' '$remote_dir/pabom-dev.service'; rmdir '$remote_dir' 2>/dev/null || true"
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/pabom_dev

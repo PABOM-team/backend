@@ -18,5 +18,7 @@ USER spring:spring
 WORKDIR /app
 COPY --from=builder /workspace/build/libs/app.jar app.jar
 
+ENV JAVA_TOOL_OPTIONS="-XX:InitialRAMPercentage=10.0 -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError"
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

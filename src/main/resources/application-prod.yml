@@ -3,12 +3,38 @@ spring:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
   jpa:
     hibernate:
       ddl-auto: validate
   flyway:
     baseline-on-migrate: false
 
+server:
+  forward-headers-strategy: framework
+
 app:
   auth:
+    allowed-origins: ${AUTH_ALLOWED_ORIGINS:https://pabom.app}
     refresh-cookie-secure: true
+    refresh-cookie-same-site: Lax
+  jwt:
+    secret: ${JWT_SECRET}
+  kakao:
+    redirect-uri: ${KAKAO_REDIRECT_URI:https://api.pabom.app/api/v1/auth/kakao/callback}
+    state-cookie-secure: true
+  google:
+    redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.pabom.app/api/v1/auth/google/callback}
+    state-cookie-secure: true
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.pabom.backend: ${LOG_LEVEL_APP:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_HIBERNATE_SQL:WARN}
