@@ -57,6 +57,7 @@ class GitHubActionsWorkflowTest {
                 "DEV_INSTANCE_ID: i-09893c17f40d15314",
                 "aws ssm send-command",
                 "--document-name AWS-RunShellScript",
+                "exec /bin/bash -s -- <<'PABOM_REMOTE_SCRIPT'",
                 "aws ssm get-command-invocation",
                 "aws s3 cp build/libs/app.jar",
                 "aws s3 cp app.jar.sha256",
