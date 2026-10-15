@@ -46,6 +46,15 @@ class GitHubActionsWorkflowTest {
                 "ci_root_password"
         );
 
+        assertThat(source).contains(
+                "vars.DEV_DEPLOY_ENABLED == 'true'",
+                "DEV_EC2_USER: ubuntu",
+                "Verify EC2 access and non-interactive sudo",
+                "sudo -n true",
+                "sudo -n '$remote_dir/deploy-dev.sh'"
+        );
+        assertThat(source).doesNotContain("DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}");
+
         String ciConfiguration = Files.readString(Path.of("src/main/resources/application-ci.yml"));
         assertThat(ciConfiguration).contains(
                 "jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}",
@@ -54,5 +63,39 @@ class GitHubActionsWorkflowTest {
                 "ddl-auto: validate",
                 "enabled: true"
         );
+    }
+
+    @Test
+    void deploymentFilesMatchTheDevEc2RuntimeAndPreserveSecrets() throws IOException {
+        String script = Files.readString(Path.of("deploy/deploy-dev.sh"));
+        String service = Files.readString(Path.of("deploy/pabom-dev.service"));
+
+        assertThat(script).contains(
+                "app_user=\"deploy\"",
+                "app_group=\"deploy\"",
+                "app_dir=\"/opt/pabom\"",
+                "env_file=\"${env_dir}/pabom-dev.env\"",
+                "previous_jar=\"${app_dir}/app.jar.previous\"",
+                "rollback_on_failure",
+                "health_url=\"http://127.0.0.1:8080/api/v1/health\"",
+                "if [ ! -f \"$env_file\" ]",
+                "chown root:\"$app_group\" \"$env_file\"",
+                "chmod 0640 \"$env_file\""
+        );
+        assertThat(script).doesNotContain(
+                "app_user=\"pabom\"",
+                "app_group=\"pabom\"",
+                "rm -f \"$env_file\""
+        );
+
+        assertThat(service).contains(
+                "User=deploy",
+                "Group=deploy",
+                "WorkingDirectory=/opt/pabom",
+                "EnvironmentFile=/etc/pabom/pabom-dev.env",
+                "Environment=\"JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m -XX:+ExitOnOutOfMemoryError\"",
+                "ExecStart=/usr/bin/java -jar /opt/pabom/app.jar"
+        );
+        assertThat(service).doesNotContain("User=pabom", "Group=pabom");
     }
 }

@@ -18,12 +18,15 @@ validation.
 
 ## Runtime environment
 
-Copy `deploy/pabom-dev.env.example` to `/etc/pabom/pabom-dev.env` on EC2,
-replace every placeholder, and restrict access to the service account:
+Create `/etc/pabom/pabom-dev.env` once during EC2 provisioning, replace every
+placeholder from `deploy/pabom-dev.env.example`, and restrict access to the
+service account. Abort if the file already exists so that a deployment cannot
+overwrite secrets:
 
 ```bash
-sudo install -d -m 0750 -o root -g pabom /etc/pabom
-sudo install -m 0640 -o root -g pabom deploy/pabom-dev.env.example /etc/pabom/pabom-dev.env
+sudo install -d -m 0750 -o root -g deploy /etc/pabom
+sudo test ! -e /etc/pabom/pabom-dev.env
+sudo install -m 0640 -o root -g deploy /dev/null /etc/pabom/pabom-dev.env
 sudo editor /etc/pabom/pabom-dev.env
 ```
 
@@ -66,3 +69,18 @@ SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
 
 The supplied `deploy/pabom-dev.service` loads
 `/etc/pabom/pabom-dev.env` automatically when started by systemd.
+
+## GitHub Actions deployment access
+
+The deployment workflow connects to EC2 as `ubuntu` and runs the deployment
+script with `sudo -n`. Before enabling automatic deployment, confirm that the
+account can use sudo without a password prompt:
+
+```bash
+sudo -n true
+```
+
+The workflow performs the same preflight check and stops before copying or
+activating a release if non-interactive sudo is unavailable. Keep
+`DEV_DEPLOY_ENABLED=false` until the EC2 environment, secrets, host key, and
+sudo policy have been verified.

@@ -9,8 +9,8 @@ fi
 artifact_path="$1"
 checksum_path="$2"
 source_service="$3"
-app_user="pabom"
-app_group="pabom"
+app_user="deploy"
+app_group="deploy"
 app_dir="/opt/pabom"
 env_dir="/etc/pabom"
 env_file="${env_dir}/pabom-dev.env"
@@ -45,20 +45,25 @@ if [ "${EUID}" -ne 0 ]; then
   exit 1
 fi
 
-for command in curl java sha256sum systemctl; do
+for command in curl getent groupadd id install java journalctl sha256sum systemctl useradd; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command is missing: $command" >&2
     exit 1
   fi
 done
 
+if ! getent group "$app_group" >/dev/null 2>&1; then
+  groupadd --system "$app_group"
+fi
 if ! id "$app_user" >/dev/null 2>&1; then
-  useradd --system --home-dir "$app_dir" --shell /usr/sbin/nologin "$app_user"
+  useradd --system --gid "$app_group" --home-dir "$app_dir" --shell /usr/sbin/nologin "$app_user"
 fi
 
 install -d -m 0755 -o "$app_user" -g "$app_group" "$app_dir"
 install -d -m 0750 -o root -g "$app_group" "$env_dir"
 
+# Runtime secrets are provisioned separately and must never be created,
+# replaced, or removed by an application deployment.
 if [ ! -f "$env_file" ]; then
   echo "Runtime environment file is missing: $env_file" >&2
   exit 1

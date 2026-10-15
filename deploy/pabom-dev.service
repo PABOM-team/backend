@@ -5,11 +5,11 @@ After=network-online.target
 
 [Service]
 Type=simple
-User=pabom
-Group=pabom
+User=deploy
+Group=deploy
 WorkingDirectory=/opt/pabom
 EnvironmentFile=/etc/pabom/pabom-dev.env
-Environment="JAVA_TOOL_OPTIONS=-XX:InitialRAMPercentage=10.0 -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError"
+Environment="JAVA_TOOL_OPTIONS=-Xms128m -Xmx384m -XX:+ExitOnOutOfMemoryError"
 ExecStart=/usr/bin/java -jar /opt/pabom/app.jar
 SuccessExitStatus=143
 Restart=on-failure
