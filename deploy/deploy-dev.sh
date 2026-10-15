@@ -24,17 +24,37 @@ previous_service="/tmp/${service_name}.previous"
 health_url="http://127.0.0.1:8080/api/v1/health"
 deployment_activated=false
 
+wait_for_health() {
+  attempts="$1"
+  for attempt in $(seq 1 "$attempts"); do
+    if curl --fail --silent --show-error --max-time 3 "$health_url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
+}
+
 rollback_on_failure() {
   result=$?
   trap - EXIT
+  set +e
   if [ "$result" -ne 0 ] && [ "$deployment_activated" = true ] && [ -f "$previous_jar" ]; then
     echo "Deployment failed. Restoring the previous application." >&2
-    install -m 0644 -o "$app_user" -g "$app_group" "$previous_jar" "$app_jar"
+    rollback_failed=false
+    install -m 0644 -o "$app_user" -g "$app_group" "$previous_jar" "$app_jar" || rollback_failed=true
     if [ -f "$previous_service" ]; then
-      install -m 0644 -o root -g root "$previous_service" "$service_file"
-      systemctl daemon-reload
+      install -m 0644 -o root -g root "$previous_service" "$service_file" || rollback_failed=true
     fi
-    systemctl restart "$service_name" || true
+    systemctl daemon-reload || rollback_failed=true
+    systemctl restart "$service_name" || rollback_failed=true
+    if [ "$rollback_failed" = false ] && wait_for_health 60; then
+      echo "Rollback completed and the previous application is healthy." >&2
+    else
+      echo "Rollback failed or the previous application did not become healthy." >&2
+    fi
+  elif [ "$result" -ne 0 ] && [ "$deployment_activated" = true ]; then
+    echo "Deployment failed and no previous JAR is available for rollback." >&2
   fi
   exit "$result"
 }
@@ -45,7 +65,7 @@ if [ "${EUID}" -ne 0 ]; then
   exit 1
 fi
 
-for command in curl getent groupadd id install java journalctl sha256sum systemctl useradd; do
+for command in curl getent groupadd id install java sha256sum systemctl useradd; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command is missing: $command" >&2
     exit 1
@@ -98,16 +118,12 @@ systemctl daemon-reload
 systemctl enable "$service_name" >/dev/null
 systemctl restart "$service_name"
 
-for attempt in $(seq 1 60); do
-  if curl --fail --silent --show-error --max-time 3 "$health_url" >/dev/null; then
-    echo "Pabom DEV deployment is healthy."
-    deployment_activated=false
-    exit 0
-  fi
-  sleep 5
-done
+if wait_for_health 60; then
+  echo "Pabom DEV deployment is healthy."
+  deployment_activated=false
+  exit 0
+fi
 
-echo "Health check failed. Recent service logs:" >&2
-journalctl -u "$service_name" --no-pager -n 100 >&2 || true
+echo "Health check failed. Service state: $(systemctl is-active "$service_name" 2>/dev/null || true)" >&2
 
 exit 1

@@ -48,12 +48,28 @@ class GitHubActionsWorkflowTest {
 
         assertThat(source).contains(
                 "vars.DEV_DEPLOY_ENABLED == 'true'",
-                "DEV_EC2_USER: ubuntu",
-                "Verify EC2 access and non-interactive sudo",
-                "sudo -n true",
-                "sudo -n '$remote_dir/deploy-dev.sh'"
+                "id-token: write",
+                "contents: read",
+                "aws-actions/configure-aws-credentials@v4",
+                "arn:aws:iam::660008587020:role/pabom-dev-github-actions-role",
+                "pabom-dev-assets-660008587020-660008587020-ap-northeast-2-an",
+                "DEV_DEPLOY_PREFIX: deploy/dev/${{ github.sha }}",
+                "DEV_INSTANCE_ID: i-09893c17f40d15314",
+                "aws ssm send-command",
+                "--document-name AWS-RunShellScript",
+                "aws ssm get-command-invocation",
+                "aws s3 cp build/libs/app.jar",
+                "aws s3 cp app.jar.sha256",
+                "aws s3 cp deploy/deploy-dev.sh",
+                "aws s3 cp deploy/pabom-dev.service"
         );
-        assertThat(source).doesNotContain("DEV_EC2_USER: ${{ secrets.DEV_EC2_USER }}");
+        assertThat(source).doesNotContain(
+                "DEV_EC2_SSH_PRIVATE_KEY",
+                "DEV_EC2_KNOWN_HOSTS",
+                "ssh-keyscan",
+                "scp ",
+                "ssh -i"
+        );
 
         String ciConfiguration = Files.readString(Path.of("src/main/resources/application-ci.yml"));
         assertThat(ciConfiguration).contains(
@@ -77,6 +93,8 @@ class GitHubActionsWorkflowTest {
                 "env_file=\"${env_dir}/pabom-dev.env\"",
                 "previous_jar=\"${app_dir}/app.jar.previous\"",
                 "rollback_on_failure",
+                "wait_for_health 60",
+                "Rollback completed and the previous application is healthy.",
                 "health_url=\"http://127.0.0.1:8080/api/v1/health\"",
                 "if [ ! -f \"$env_file\" ]",
                 "chown root:\"$app_group\" \"$env_file\"",
@@ -85,7 +103,8 @@ class GitHubActionsWorkflowTest {
         assertThat(script).doesNotContain(
                 "app_user=\"pabom\"",
                 "app_group=\"pabom\"",
-                "rm -f \"$env_file\""
+                "rm -f \"$env_file\"",
+                "journalctl"
         );
 
         assertThat(service).contains(
