@@ -57,25 +57,25 @@ jobs:
 
     # CI에서만 사용하는 일회성 MySQL 접속 정보다.
     env:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ci
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_NAME: pabom_ci
       DB_USERNAME: pabom_ci
-      DB_PASSWORD: ci_password
+      DB_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
 
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: ci_root_password
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
           MYSQL_DATABASE: pabom_ci
           MYSQL_USER: pabom_ci
-          MYSQL_PASSWORD: ci_password
+          MYSQL_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -95,6 +95,14 @@ jobs:
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
+
+      - name: Verify CI MySQL service
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Spring profile: $SPRING_PROFILES_ACTIVE"
+          echo "JDBC target: mysql://$DB_HOST:$DB_PORT/$DB_NAME"
+          docker inspect --format='{{.State.Health.Status}}' '${{ job.services.mysql.id }}' | grep -Fx healthy
 
       - name: 1. Compile source
         run: ./gradlew clean compileJava --no-daemon
