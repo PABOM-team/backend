@@ -9,7 +9,8 @@ spring:
     hibernate:
       ddl-auto: validate
   flyway:
-    baseline-on-migrate: false
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: ${FLYWAY_BASELINE_VERSION:20261011000100}
 
 app:
   jwt:

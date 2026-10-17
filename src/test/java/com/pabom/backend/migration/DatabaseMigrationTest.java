@@ -19,6 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 class DatabaseMigrationTest {
 
     private static final String INITIAL_VERSION = "20261011000100";
+    private static final String FILE_VERSION = "20261017000100";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -33,6 +34,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 INITIAL_VERSION
         );
+        Boolean fileMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                FILE_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -43,11 +49,13 @@ class DatabaseMigrationTest {
         );
 
         assertThat(success).isTrue();
+        assertThat(fileMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
                 "user_agreements",
-                "events"
+                "events",
+                "files"
         );
     }
 
