@@ -1,13 +1,16 @@
 package com.pabom.backend.global.error;
 
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
-
+import com.pabom.backend.file.domain.error.FileErrorCode;
 import com.pabom.backend.global.response.ApiResponseBody;
 import com.pabom.backend.global.response.ApiResponseBody.ErrorBody;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -46,6 +49,47 @@ public class GlobalExceptionHandler {
                 errorCode.getMessage(),
                 new FieldErrorDetail(exception.getParameterName(), "필수 요청 파라미터입니다.")
         );
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponseBody.fail(error, request));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponseBody<Void>> handleMissingPart(
+            MissingServletRequestPartException exception,
+            HttpServletRequest request
+    ) {
+        BaseErrorCode errorCode = AuthErrorCode.VALIDATION_FAILED;
+        ErrorBody error = new ErrorBody(
+                errorCode.getCode(),
+                errorCode.getMessage(),
+                new FieldErrorDetail(exception.getRequestPartName(), "필수 요청 값입니다.")
+        );
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponseBody.fail(error, request));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponseBody<Void>> handleTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        BaseErrorCode errorCode = AuthErrorCode.VALIDATION_FAILED;
+        ErrorBody error = new ErrorBody(
+                errorCode.getCode(),
+                errorCode.getMessage(),
+                new FieldErrorDetail(exception.getName(), "올바른 형식의 값이 아닙니다.")
+        );
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(ApiResponseBody.fail(error, request));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponseBody<Void>> handleMaxUploadSize(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        BaseErrorCode errorCode = FileErrorCode.FILE_TOO_LARGE;
+        ErrorBody error = new ErrorBody(errorCode.getCode(), errorCode.getMessage(), null);
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponseBody.fail(error, request));
     }

@@ -1,6 +1,10 @@
 spring:
   application:
     name: pabom-backend
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 51MB
   lifecycle:
     timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   profiles:
@@ -32,7 +36,7 @@ app:
     s3:
       region: ${AWS_REGION:ap-northeast-2}
       bucket: ${S3_BUCKET}
-      presigned-url-expiration-seconds: ${S3_PRESIGNED_URL_EXPIRATION_SECONDS:3600}
+      presigned-url-expiration-seconds: ${S3_PRESIGNED_URL_EXPIRATION_SECONDS:600}
 
 management:
   endpoints:
