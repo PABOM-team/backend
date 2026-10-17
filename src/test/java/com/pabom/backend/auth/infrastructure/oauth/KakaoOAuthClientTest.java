@@ -23,6 +23,9 @@ import org.springframework.web.client.RestTemplate;
 
 class KakaoOAuthClientTest {
 
+    private static final String REDIRECT_URI =
+            "https://dev.pabom.app/api/v1/auth/kakao/callback";
+
     private MockRestServiceServer server;
     private KakaoOAuthClient kakaoOAuthClient;
 
@@ -33,7 +36,7 @@ class KakaoOAuthClientTest {
         KakaoOAuthProperties properties = new KakaoOAuthProperties(
                 "client-id",
                 "client-secret",
-                "http://localhost:8080/api/v1/auth/kakao/callback"
+                REDIRECT_URI
         );
         kakaoOAuthClient = new KakaoOAuthClient(restTemplate, properties);
     }
@@ -44,6 +47,7 @@ class KakaoOAuthClientTest {
 
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
+                .contains("redirect_uri=https://dev.pabom.app/api/v1/auth/kakao/callback")
                 .contains("response_type=code")
                 .contains("scope=profile_nickname")
                 .doesNotContain("account_email")
@@ -57,6 +61,8 @@ class KakaoOAuthClientTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("code=authorization-code")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("client_secret=client-secret")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "redirect_uri=https%3A%2F%2Fdev.pabom.app%2Fapi%2Fv1%2Fauth%2Fkakao%2Fcallback")))
                 .andRespond(withSuccess("{\"access_token\":\"kakao-access-token\"}", MediaType.APPLICATION_JSON));
 
         server.expect(once(), requestTo("https://kapi.kakao.com/v2/user/me"))

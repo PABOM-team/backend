@@ -23,6 +23,9 @@ import org.springframework.web.client.RestTemplate;
 
 class GoogleOAuthClientTest {
 
+    private static final String REDIRECT_URI =
+            "https://dev.pabom.app/api/v1/auth/google/callback";
+
     private MockRestServiceServer server;
     private GoogleOAuthClient googleOAuthClient;
 
@@ -33,7 +36,7 @@ class GoogleOAuthClientTest {
         GoogleOAuthProperties properties = new GoogleOAuthProperties(
                 "client-id",
                 "client-secret",
-                "http://localhost:8080/api/v1/auth/google/callback"
+                REDIRECT_URI
         );
         googleOAuthClient = new GoogleOAuthClient(restTemplate, properties);
     }
@@ -44,6 +47,7 @@ class GoogleOAuthClientTest {
 
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
+                .contains("redirect_uri=https://dev.pabom.app/api/v1/auth/google/callback")
                 .contains("response_type=code")
                 .contains("scope=openid%20profile")
                 .doesNotContain("email")
@@ -57,6 +61,8 @@ class GoogleOAuthClientTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("code=authorization-code")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("client_secret=client-secret")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "redirect_uri=https%3A%2F%2Fdev.pabom.app%2Fapi%2Fv1%2Fauth%2Fgoogle%2Fcallback")))
                 .andRespond(withSuccess("{\"access_token\":\"google-access-token\"}", MediaType.APPLICATION_JSON));
 
         server.expect(once(), requestTo("https://openidconnect.googleapis.com/v1/userinfo"))

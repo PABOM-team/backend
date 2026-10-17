@@ -35,9 +35,9 @@ Required application variables:
 - Database: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
 - JWT: `JWT_SECRET` (at least 32 bytes)
 - Kakao OAuth: `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`; the DEV callback URL
-  defaults to `https://dev.api.pabom.app/api/v1/auth/kakao/callback`
+  defaults to `https://dev.pabom.app/api/v1/auth/kakao/callback`
 - Google OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`; the DEV callback URL
-  defaults to `https://dev.api.pabom.app/api/v1/auth/google/callback`
+  defaults to `https://dev.pabom.app/api/v1/auth/google/callback`
 - S3: `S3_BUCKET`; `AWS_REGION` defaults to `ap-northeast-2`
 
 `AUTH_ALLOWED_ORIGINS` defaults to `https://dev.pabom.app`. The pool, timeout,
