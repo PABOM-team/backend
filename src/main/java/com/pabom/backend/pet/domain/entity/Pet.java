@@ -64,6 +64,9 @@ public class Pet {
     @Column(name = "hatched_at")
     private LocalDate hatchedAt;
 
+    @Column(name = "adopted_at")
+    private LocalDate adoptedAt;
+
     @Column(name = "life_stage_id")
     private Long lifeStageId;
 
@@ -99,6 +102,7 @@ public class Pet {
             Collection<Morph> morphs,
             String customMorph,
             LocalDate hatchedAt,
+            LocalDate adoptedAt,
             Long lifeStageId,
             Certainty stageCertainty,
             Sex sex,
@@ -114,6 +118,7 @@ public class Pet {
         pet.morphs.addAll(morphs);
         pet.customMorph = customMorph;
         pet.hatchedAt = hatchedAt;
+        pet.adoptedAt = adoptedAt;
         pet.lifeStageId = lifeStageId;
         pet.stageCertainty = stageCertainty;
         pet.sex = sex;
@@ -142,6 +147,11 @@ public class Pet {
 
     public void updateHatchedAt(LocalDate hatchedAt, Instant now) {
         this.hatchedAt = hatchedAt;
+        touch(now);
+    }
+
+    public void updateAdoptedAt(LocalDate adoptedAt, Instant now) {
+        this.adoptedAt = adoptedAt;
         touch(now);
     }
 
@@ -184,6 +194,7 @@ public class Pet {
     }
     public String getCustomMorph() { return customMorph; }
     public LocalDate getHatchedAt() { return hatchedAt; }
+    public LocalDate getAdoptedAt() { return adoptedAt; }
     public Long getLifeStageId() { return lifeStageId; }
     public Certainty getStageCertainty() { return stageCertainty; }
     public Sex getSex() { return sex; }

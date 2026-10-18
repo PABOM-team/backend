@@ -14,6 +14,7 @@ public record PetResult(
         List<MorphItem> morphs,
         String customMorph,
         LocalDate hatchedAt,
+        LocalDate adoptedAt,
         Long lifeStageId,
         Certainty stageCertainty,
         Sex sex,
@@ -22,6 +23,16 @@ public record PetResult(
         Instant createdAt,
         Instant updatedAt
 ) {
+    public PetResult(
+            Long id, Long speciesId, String name, List<MorphItem> morphs,
+            String customMorph, LocalDate hatchedAt, Long lifeStageId,
+            Certainty stageCertainty, Sex sex, Certainty sexCertainty,
+            Long photoFileId, Instant createdAt, Instant updatedAt
+    ) {
+        this(id, speciesId, name, morphs, customMorph, hatchedAt, null, lifeStageId,
+                stageCertainty, sex, sexCertainty, photoFileId, createdAt, updatedAt);
+    }
+
     public static PetResult from(Pet pet) {
         return new PetResult(
                 pet.getId(),
@@ -32,6 +43,7 @@ public record PetResult(
                         .toList(),
                 pet.getCustomMorph(),
                 pet.getHatchedAt(),
+                pet.getAdoptedAt(),
                 pet.getLifeStageId(),
                 pet.getStageCertainty(),
                 pet.getSex(),

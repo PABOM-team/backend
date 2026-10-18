@@ -12,6 +12,7 @@ import com.pabom.backend.pet.application.command.CreatePetCommand;
 import com.pabom.backend.pet.application.command.PatchValue;
 import com.pabom.backend.pet.application.command.UpdatePetCommand;
 import com.pabom.backend.pet.application.result.PetResult;
+import com.pabom.backend.pet.application.result.PetListResult;
 import com.pabom.backend.pet.domain.error.PetErrorCode;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
@@ -28,6 +29,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +53,7 @@ class PetServiceIntegrationTest {
     @Autowired private MorphJpaRepository morphRepository;
     @Autowired private LifeStageJpaRepository lifeStageRepository;
     @Autowired private FileJpaRepository fileRepository;
+    @Autowired private EntityManagerFactory entityManagerFactory;
 
     private User owner;
     private User other;
@@ -94,6 +98,7 @@ class PetServiceIntegrationTest {
         assertThat(result.name()).isEqualTo("모찌");
         assertThat(result.morphs()).isEmpty();
         assertThat(result.hatchedAt()).isNull();
+        assertThat(result.adoptedAt()).isNull();
         assertThat(result.lifeStageId()).isNull();
         assertThat(result.stageCertainty()).isEqualTo(Certainty.UNKNOWN);
         assertThat(result.sex()).isEqualTo(Sex.UNKNOWN);
@@ -141,15 +146,93 @@ class PetServiceIntegrationTest {
 
     @Test
     void listsAndGetsOnlyOwnedPets() {
-        PetResult owned = commandService.create(owner.getId(), command(List.of(), null));
+        PetResult olderOwned = commandService.create(owner.getId(), command(List.of(), null));
+        PetResult newerOwned = commandService.create(owner.getId(), command(List.of(), null));
         commandService.create(other.getId(), command(List.of(), null));
 
-        assertThat(queryService.getAll(owner.getId())).extracting(PetResult::id)
-                .containsExactly(owned.id());
-        assertThat(queryService.get(owner.getId(), owned.id()).id()).isEqualTo(owned.id());
-        assertThatThrownBy(() -> queryService.get(other.getId(), owned.id()))
+        assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
+                .containsExactly(newerOwned.id(), olderOwned.id());
+        assertThat(queryService.get(owner.getId(), olderOwned.id()).id()).isEqualTo(olderOwned.id());
+        assertThatThrownBy(() -> queryService.get(other.getId(), olderOwned.id()))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+    }
+
+    @Test
+    void listsScreenFieldsWithDisplayNamesAndNullableValues() {
+        Long adultId = adultId();
+        PetResult withStage = commandService.create(owner.getId(), withStage(
+                command(List.of(morph("HARLEQUIN").getId()), "기타 모프"),
+                adultId,
+                Certainty.CONFIRMED
+        ));
+        PetResult withoutStage = commandService.create(owner.getId(), command(List.of(), null));
+
+        List<PetListResult> results = queryService.getAll(owner.getId());
+
+        PetListResult first = results.stream().filter(item -> item.id().equals(withStage.id())).findFirst().orElseThrow();
+        assertThat(first.speciesName()).isEqualTo(crested.getCommonName());
+        assertThat(first.lifeStageName()).isEqualTo("성체");
+        assertThat(first.morphs()).extracting(PetResult.MorphItem::code).containsExactly("HARLEQUIN");
+        assertThat(first.customMorph()).isEqualTo("기타 모프");
+        assertThat(first.photoFileId()).isNull();
+
+        PetListResult second = results.stream().filter(item -> item.id().equals(withoutStage.id())).findFirst().orElseThrow();
+        assertThat(second.lifeStageId()).isNull();
+        assertThat(second.lifeStageName()).isNull();
+        assertThat(second.morphs()).isEmpty();
+    }
+
+    @Test
+    void listQueryCountDoesNotGrowWithNumberOfPets() {
+        commandService.create(owner.getId(), withStage(command(List.of(), null), adultId(), Certainty.CONFIRMED));
+        commandService.create(owner.getId(), withStage(command(List.of(), null), adultId(), Certainty.CONFIRMED));
+        SessionFactory sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
+        sessionFactory.getStatistics().setStatisticsEnabled(true);
+        sessionFactory.getStatistics().clear();
+
+        queryService.getAll(owner.getId());
+
+        assertThat(sessionFactory.getStatistics().getPrepareStatementCount()).isEqualTo(3);
+    }
+
+    @Test
+    void createsGetsAndPatchesAdoptedAtWithAbsentAndExplicitNullSemantics() {
+        LocalDate original = LocalDate.of(2026, 4, 10);
+        PetResult created = commandService.create(owner.getId(), withAdoptedAt(command(List.of(), null), original));
+        assertThat(created.adoptedAt()).isEqualTo(original);
+        assertThat(queryService.get(owner.getId(), created.id()).adoptedAt()).isEqualTo(original);
+
+        PetResult omitted = commandService.update(owner.getId(), created.id(), emptyUpdate());
+        assertThat(omitted.adoptedAt()).isEqualTo(original);
+
+        UpdatePetCommand changed = new UpdatePetCommand(
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.of(LocalDate.of(2026, 5, 1)), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent()
+        );
+        assertThat(commandService.update(owner.getId(), created.id(), changed).adoptedAt())
+                .isEqualTo(LocalDate.of(2026, 5, 1));
+
+        UpdatePetCommand removed = new UpdatePetCommand(
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.of(null), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent()
+        );
+        assertThat(commandService.update(owner.getId(), created.id(), removed).adoptedAt()).isNull();
+    }
+
+    @Test
+    void rejectsFutureAdoptedAtOnCreateAndPatch() {
+        LocalDate future = LocalDate.now().plusDays(1);
+        assertError(withAdoptedAt(command(List.of(), null), future), PetErrorCode.ADOPTED_AT_INVALID);
+        PetResult created = commandService.create(owner.getId(), command(List.of(), null));
+        UpdatePetCommand update = new UpdatePetCommand(
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.of(future), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent()
+        );
+        assertUpdateError(created.id(), update, PetErrorCode.ADOPTED_AT_INVALID);
     }
 
     @Test
@@ -301,6 +384,14 @@ class PetServiceIntegrationTest {
                 source.clientRequestId(), source.speciesId(), source.name(), source.morphIds(),
                 source.customMorph(), source.hatchedAt(), source.lifeStageId(), source.stageCertainty(),
                 source.sex(), source.sexCertainty(), photoFileId
+        );
+    }
+
+    private CreatePetCommand withAdoptedAt(CreatePetCommand source, LocalDate adoptedAt) {
+        return new CreatePetCommand(
+                source.clientRequestId(), source.speciesId(), source.name(), source.morphIds(),
+                source.customMorph(), source.hatchedAt(), adoptedAt, source.lifeStageId(),
+                source.stageCertainty(), source.sex(), source.sexCertainty(), source.photoFileId()
         );
     }
 

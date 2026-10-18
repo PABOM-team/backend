@@ -90,6 +90,12 @@ public class PetValidator {
         }
     }
 
+    public void validateAdoptedAt(LocalDate adoptedAt) {
+        if (adoptedAt != null && adoptedAt.isAfter(LocalDate.now(clock))) {
+            throw new BusinessException(PetErrorCode.ADOPTED_AT_INVALID);
+        }
+    }
+
     public void validateLifeStage(Long lifeStageId, Certainty stageCertainty) {
         if (stageCertainty == Certainty.UNKNOWN && lifeStageId != null) {
             throw new BusinessException(SpeciesErrorCode.LIFE_STAGE_INVALID);

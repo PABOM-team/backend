@@ -1,5 +1,6 @@
 package com.pabom.backend.pet.presentation.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.pabom.backend.pet.application.command.CreatePetCommand;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
@@ -27,6 +28,9 @@ public record CreatePetRequest(
         @Size(max = 40) String customMorph,
         @Schema(description = "부화일. 모르면 null", example = "2026-03-02", type = "string", format = "date", nullable = true)
         @PastOrPresent LocalDate hatchedAt,
+        @Schema(description = "데려온 날. 생략 또는 null 허용", example = "2026-04-10",
+                type = "string", format = "date", nullable = true)
+        @PastOrPresent @JsonFormat(pattern = "yyyy-MM-dd") LocalDate adoptedAt,
         @Schema(description = "성장 단계 ID. stageCertainty가 CONFIRMED 또는 ESTIMATED이면 필수이며, UNKNOWN이면 null이어야 함",
                 example = "1", nullable = true)
         Long lifeStageId,
@@ -48,6 +52,7 @@ public record CreatePetRequest(
                 morphIds,
                 customMorph,
                 hatchedAt,
+                adoptedAt,
                 lifeStageId,
                 stageCertainty,
                 sex,

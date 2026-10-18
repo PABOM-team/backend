@@ -44,6 +44,7 @@ public class PetCommandService {
         List<Morph> morphs = validator.resolveMorphs(command.speciesId(), command.morphIds());
         validator.validateMorphCombination(morphs, customMorph);
         validator.validateHatchedAt(command.hatchedAt());
+        validator.validateAdoptedAt(command.adoptedAt());
         validator.validatePhoto(command.photoFileId(), userId);
 
         Certainty stageCertainty = defaultCertainty(command.stageCertainty());
@@ -59,6 +60,7 @@ public class PetCommandService {
                 morphs,
                 customMorph,
                 command.hatchedAt(),
+                command.adoptedAt(),
                 command.lifeStageId(),
                 stageCertainty,
                 sex,
@@ -108,6 +110,10 @@ public class PetCommandService {
         if (command.hatchedAt().present()) {
             validator.validateHatchedAt(command.hatchedAt().value());
             pet.updateHatchedAt(command.hatchedAt().value(), now);
+        }
+        if (command.adoptedAt().present()) {
+            validator.validateAdoptedAt(command.adoptedAt().value());
+            pet.updateAdoptedAt(command.adoptedAt().value(), now);
         }
         if (command.lifeStageId().present()) {
             pet.updateLifeStage(command.lifeStageId().value(), now);

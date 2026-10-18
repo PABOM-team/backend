@@ -2,6 +2,7 @@ package com.pabom.backend.config;
 
 import com.pabom.backend.global.response.ResultType;
 import com.pabom.backend.pet.presentation.response.PetResponse;
+import com.pabom.backend.pet.presentation.response.PetListResponse;
 import com.pabom.backend.species.presentation.response.MorphResponse;
 import com.pabom.backend.species.presentation.response.SpeciesResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -59,7 +60,7 @@ public final class OpenApiSchemas {
     ) {
     }
 
-    public record PetListSuccess(List<PetResponse> data) {
+    public record PetListSuccess(List<PetListResponse> data) {
     }
 
     @Schema(name = "ErrorApiResponse")

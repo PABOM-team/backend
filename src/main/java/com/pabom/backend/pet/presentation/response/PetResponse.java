@@ -1,5 +1,6 @@
 package com.pabom.backend.pet.presentation.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.pabom.backend.pet.application.result.PetResult;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
@@ -16,6 +17,8 @@ public record PetResponse(
         @Schema(description = "기타 모프", example = "트라이컬러", nullable = true) String customMorph,
         @Schema(description = "부화일", example = "2026-03-02", type = "string", format = "date", nullable = true)
         LocalDate hatchedAt,
+        @Schema(description = "데려온 날", example = "2026-04-10", type = "string", format = "date", nullable = true)
+        @JsonFormat(pattern = "yyyy-MM-dd") LocalDate adoptedAt,
         @Schema(description = "성장 단계 ID", example = "1", nullable = true) Long lifeStageId,
         @Schema(description = "성장 단계 정확성", example = "CONFIRMED") Certainty stageCertainty,
         @Schema(description = "성별", example = "FEMALE") Sex sex,
@@ -36,6 +39,7 @@ public record PetResponse(
                         .toList(),
                 result.customMorph(),
                 result.hatchedAt(),
+                result.adoptedAt(),
                 result.lifeStageId(),
                 result.stageCertainty(),
                 result.sex(),
