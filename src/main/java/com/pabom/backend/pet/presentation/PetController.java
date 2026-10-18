@@ -1,6 +1,7 @@
 package com.pabom.backend.pet.presentation;
 
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.CREATE_REQUEST;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.ADOPTED_AT_INVALID;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.CREATE_SUCCESS;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.CUSTOM_MORPH_INVALID;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.DETAIL_SUCCESS;
@@ -31,6 +32,7 @@ import com.pabom.backend.pet.application.service.PetQueryService;
 import com.pabom.backend.pet.presentation.request.CreatePetRequest;
 import com.pabom.backend.pet.presentation.request.UpdatePetRequest;
 import com.pabom.backend.pet.presentation.response.PetResponse;
+import com.pabom.backend.pet.presentation.response.PetListResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -66,7 +68,7 @@ public class PetController {
     @PostMapping
     @Operation(
             summary = "개체 등록",
-            description = "인증 사용자를 소유자로 등록합니다. photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다.",
+            description = "인증 사용자를 소유자로 등록합니다. adoptedAt과 photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
@@ -92,6 +94,7 @@ public class PetController {
                                     @ExampleObject(name = "CUSTOM_MORPH_INVALID", value = CUSTOM_MORPH_INVALID),
                                     @ExampleObject(name = "PET_NAME_INVALID", value = PET_NAME_INVALID),
                                     @ExampleObject(name = "HATCHED_AT_INVALID", value = HATCHED_AT_INVALID),
+                                    @ExampleObject(name = "ADOPTED_AT_INVALID", value = ADOPTED_AT_INVALID),
                                     @ExampleObject(name = "PET_PHOTO_INVALID", value = PET_PHOTO_INVALID)
                             })),
             @ApiResponse(responseCode = "401", description = "INVALID_TOKEN",
@@ -135,13 +138,13 @@ public class PetController {
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
                             examples = @ExampleObject(name = "INVALID_TOKEN", value = INVALID_TOKEN)))
     })
-    public ResponseEntity<ApiResponseBody<List<PetResponse>>> getAll(
+    public ResponseEntity<ApiResponseBody<List<PetListResponse>>> getAll(
             @AuthenticationPrincipal AuthUser authUser,
             HttpServletRequest request
     ) {
         requireAuthentication(authUser);
-        List<PetResponse> response = queryService.getAll(authUser.userId()).stream()
-                .map(PetResponse::from)
+        List<PetListResponse> response = queryService.getAll(authUser.userId()).stream()
+                .map(PetListResponse::from)
                 .toList();
         return ResponseEntity.ok(ApiResponseBody.success(response, request));
     }
@@ -177,7 +180,7 @@ public class PetController {
     @PatchMapping("/{petId}")
     @Operation(
             summary = "내 개체 기본 정보 수정",
-            description = "생략한 필드는 유지합니다. morphIds 빈 배열은 전체 해제이며 customMorph, hatchedAt, lifeStageId, photoFileId의 명시적 null은 해당 값을 삭제합니다.",
+            description = "생략한 필드는 유지합니다. morphIds 빈 배열은 전체 해제이며 customMorph, hatchedAt, adoptedAt, lifeStageId, photoFileId의 명시적 null은 해당 값을 삭제합니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
@@ -202,6 +205,7 @@ public class PetController {
                                     @ExampleObject(name = "CUSTOM_MORPH_INVALID", value = CUSTOM_MORPH_INVALID),
                                     @ExampleObject(name = "PET_NAME_INVALID", value = PET_NAME_INVALID),
                                     @ExampleObject(name = "HATCHED_AT_INVALID", value = HATCHED_AT_INVALID),
+                                    @ExampleObject(name = "ADOPTED_AT_INVALID", value = ADOPTED_AT_INVALID),
                                     @ExampleObject(name = "PET_PHOTO_INVALID", value = PET_PHOTO_INVALID)
                             })),
             @ApiResponse(responseCode = "401", description = "INVALID_TOKEN",

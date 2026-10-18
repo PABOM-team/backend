@@ -9,4 +9,6 @@ public interface SpeciesRepository {
     List<Species> findAllOrdered();
 
     Optional<Species> findById(Long id);
+
+    List<Species> findAllById(Iterable<Long> ids);
 }

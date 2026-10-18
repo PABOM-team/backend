@@ -42,6 +42,8 @@ class PetSwaggerTest {
                         .value("550e8400-e29b-41d4-a716-446655440000"))
                 .andExpect(jsonPath("$.paths['/api/v1/pets/{petId}'].patch.requestBody.content['application/json'].examples['개체 수정'].value.hatchedAt")
                         .doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/pets/{petId}'].patch.requestBody.content['application/json'].examples['개체 수정'].value.adoptedAt")
+                        .doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/pets'].post.responses['201'].content['application/json'].examples['등록 성공'].value.resultType")
                         .value("SUCCESS"))
                 .andExpect(jsonPath("$.paths['/api/v1/pets'].post.responses['201'].content['application/json'].examples['등록 성공'].value.error")
@@ -92,15 +94,24 @@ class PetSwaggerTest {
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.clientRequestId.format").value("uuid"))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.morphIds.type", hasItem("array")))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.hatchedAt.format").value("date"))
+                .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.adoptedAt.format").value("date"))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.required",
                         containsInAnyOrder("clientRequestId", "speciesId", "name")))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.customMorph.type", hasItem("null")))
                 .andExpect(jsonPath("$.components.schemas.UpdatePetRequest.properties.customMorph.type", hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.UpdatePetRequest.properties.adoptedAt.type", hasItem("null")))
                 .andExpect(jsonPath("$.components.schemas.UpdatePetRequest.properties.namePresent").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.PetResponse.properties.morphs.type").value("array"))
+                .andExpect(jsonPath("$.components.schemas.PetResponse.properties.adoptedAt.format").value("date"))
                 .andExpect(jsonPath("$.components.schemas.PetResponse.properties.createdAt.format").value("date-time"))
                 .andExpect(jsonPath("$.components.schemas.PetResponse.properties.sex.enum").isArray())
                 .andExpect(jsonPath("$.components.schemas.PetResponse.properties.sexCertainty.enum").isArray())
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.speciesName.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.lifeStageName.type", hasItem("string")))
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.customMorph.type", hasItem("null")))
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.hatchedAt").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.adoptedAt").doesNotExist())
+                .andExpect(jsonPath("$.components.schemas.PetListResponse.properties.sex").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.SpeciesResponse.properties.category.enum").isArray());
     }
 }

@@ -22,4 +22,9 @@ public class SpeciesPersistenceAdapter implements SpeciesRepository {
     public Optional<Species> findById(Long id) {
         return repository.findById(id);
     }
+
+    @Override
+    public List<Species> findAllById(Iterable<Long> ids) {
+        return repository.findAllById(ids);
+    }
 }

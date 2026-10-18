@@ -21,6 +21,7 @@ class DatabaseMigrationTest {
     private static final String INITIAL_VERSION = "20261011000100";
     private static final String FILE_VERSION = "20261017000100";
     private static final String PET_VERSION = "20261018000100";
+    private static final String ADOPTED_AT_VERSION = "20261018000200";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -45,6 +46,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 PET_VERSION
         );
+        Boolean adoptedAtMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                ADOPTED_AT_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -57,6 +63,7 @@ class DatabaseMigrationTest {
         assertThat(success).isTrue();
         assertThat(fileMigrationSuccess).isTrue();
         assertThat(petMigrationSuccess).isTrue();
+        assertThat(adoptedAtMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
@@ -69,6 +76,22 @@ class DatabaseMigrationTest {
                 "pets",
                 "pet_morphs"
         );
+    }
+
+    @Test
+    void addsNullableAdoptedAtDateColumn() {
+        var column = jdbcTemplate.queryForMap(
+                """
+                SELECT data_type, is_nullable
+                  FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND table_name = 'pets'
+                   AND column_name = 'adopted_at'
+                """
+        );
+
+        assertThat(column.get("DATA_TYPE").toString()).isEqualToIgnoringCase("date");
+        assertThat(column.get("IS_NULLABLE").toString()).isEqualToIgnoringCase("yes");
     }
 
     @Test

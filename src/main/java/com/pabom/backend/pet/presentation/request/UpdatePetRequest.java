@@ -1,6 +1,7 @@
 package com.pabom.backend.pet.presentation.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.pabom.backend.pet.application.command.PatchValue;
 import com.pabom.backend.pet.application.command.UpdatePetCommand;
@@ -29,6 +30,11 @@ public class UpdatePetRequest {
             type = "string", format = "date", nullable = true)
     @PastOrPresent
     private LocalDate hatchedAt;
+    @Schema(description = "데려온 날. 생략하면 유지, 명시적 null이면 삭제", example = "2026-04-10",
+            type = "string", format = "date", nullable = true)
+    @PastOrPresent
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate adoptedAt;
     @Schema(description = "성장 단계 ID. 생략하면 유지, null이면 해제. 최종 정확성이 CONFIRMED/ESTIMATED이면 필수",
             example = "1", nullable = true)
     private Long lifeStageId;
@@ -46,6 +52,7 @@ public class UpdatePetRequest {
     private boolean morphIdsPresent;
     private boolean customMorphPresent;
     private boolean hatchedAtPresent;
+    private boolean adoptedAtPresent;
     private boolean lifeStageIdPresent;
     private boolean stageCertaintyPresent;
     private boolean sexPresent;
@@ -62,6 +69,9 @@ public class UpdatePetRequest {
     @JsonSetter("hatchedAt")
     @Schema(description = "부화일. 명시적 null이면 모름", nullable = true)
     public void setHatchedAt(LocalDate hatchedAt) { this.hatchedAt = hatchedAt; this.hatchedAtPresent = true; }
+    @JsonSetter("adoptedAt")
+    @Schema(description = "데려온 날. 명시적 null이면 삭제", nullable = true)
+    public void setAdoptedAt(LocalDate adoptedAt) { this.adoptedAt = adoptedAt; this.adoptedAtPresent = true; }
     @JsonSetter("lifeStageId")
     @Schema(description = "성장 단계 ID. 명시적 null이면 해제하며 최종 정확성과 함께 검증", nullable = true)
     public void setLifeStageId(Long lifeStageId) { this.lifeStageId = lifeStageId; this.lifeStageIdPresent = true; }
@@ -82,6 +92,7 @@ public class UpdatePetRequest {
                 field(morphIdsPresent, morphIds),
                 field(customMorphPresent, customMorph),
                 field(hatchedAtPresent, hatchedAt),
+                field(adoptedAtPresent, adoptedAt),
                 field(lifeStageIdPresent, lifeStageId),
                 field(stageCertaintyPresent, stageCertainty),
                 field(sexPresent, sex),

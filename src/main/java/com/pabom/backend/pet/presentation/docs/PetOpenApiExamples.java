@@ -6,27 +6,27 @@ public final class PetOpenApiExamples {
     }
 
     public static final String CREATE_REQUEST = """
-            {"clientRequestId":"550e8400-e29b-41d4-a716-446655440000","speciesId":1,"name":"콩이","morphIds":[2,4],"customMorph":null,"hatchedAt":"2026-03-02","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null}
+            {"clientRequestId":"550e8400-e29b-41d4-a716-446655440000","speciesId":1,"name":"콩이","morphIds":[2,4],"customMorph":null,"hatchedAt":"2026-03-02","adoptedAt":"2026-04-10","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null}
             """;
 
     public static final String UPDATE_REQUEST = """
-            {"name":"콩콩이","morphIds":[3],"customMorph":null,"hatchedAt":null,"sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null}
+            {"name":"콩콩이","morphIds":[3],"customMorph":null,"adoptedAt":null,"sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null}
             """;
 
     public static final String CREATE_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"},{"id":4,"code":"DALMATIAN","name":"달마시안"}],"customMorph":null,"hatchedAt":"2026-03-02","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T07:52:18.222Z"}},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
+            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"},{"id":4,"code":"DALMATIAN","name":"달마시안"}],"customMorph":null,"hatchedAt":"2026-03-02","adoptedAt":"2026-04-10","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T07:52:18.222Z"}},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;
 
     public static final String LIST_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":[{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"}],"customMorph":null,"hatchedAt":"2026-03-02","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T07:52:18.222Z"}]},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
+            {"resultType":"SUCCESS","success":{"data":[{"id":12,"name":"콩이","speciesId":1,"speciesName":"크레스티드 게코","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"}],"customMorph":null,"lifeStageId":2,"lifeStageName":"준성체","photoFileId":null}]},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;
 
     public static final String DETAIL_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"}],"customMorph":null,"hatchedAt":"2026-03-02","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T07:52:18.222Z"}},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets/12"}}
+            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"}],"customMorph":null,"hatchedAt":"2026-03-02","adoptedAt":"2026-04-10","lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T07:52:18.222Z"}},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets/12"}}
             """;
 
     public static final String UPDATE_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩콩이","morphs":[{"id":3,"code":"FLAME","name":"플레임"}],"customMorph":null,"hatchedAt":null,"lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T08:10:00.000Z"}},"error":null,"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
+            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩콩이","morphs":[{"id":3,"code":"FLAME","name":"플레임"}],"customMorph":null,"hatchedAt":null,"adoptedAt":null,"lifeStageId":1,"stageCertainty":"CONFIRMED","sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T08:10:00.000Z"}},"error":null,"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
             """;
 
     public static final String VALIDATION_FAILED = """
@@ -64,6 +64,9 @@ public final class PetOpenApiExamples {
             """;
     public static final String HATCHED_AT_INVALID = """
             {"resultType":"FAIL","success":null,"error":{"code":"HATCHED_AT_INVALID","message":"부화일은 미래일 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
+            """;
+    public static final String ADOPTED_AT_INVALID = """
+            {"resultType":"FAIL","success":null,"error":{"code":"ADOPTED_AT_INVALID","message":"데려온 날은 미래일 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;
     public static final String PET_PHOTO_INVALID = """
             {"resultType":"FAIL","success":null,"error":{"code":"PET_PHOTO_INVALID","message":"사용할 수 없는 개체 사진 파일입니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}

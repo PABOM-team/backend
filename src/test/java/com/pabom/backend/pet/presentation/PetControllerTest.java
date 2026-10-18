@@ -13,6 +13,7 @@ import com.pabom.backend.global.error.GlobalExceptionHandler;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.security.AuthUser;
 import com.pabom.backend.pet.application.result.PetResult;
+import com.pabom.backend.pet.application.result.PetListResult;
 import com.pabom.backend.pet.application.service.PetCommandService;
 import com.pabom.backend.pet.application.service.PetQueryService;
 import com.pabom.backend.pet.domain.type.Certainty;
@@ -69,6 +70,7 @@ class PetControllerTest {
                                   "name":"콩이",
                                   "morphIds":[],
                                   "hatchedAt":null,
+                                  "adoptedAt":"2026-04-10",
                                   "sex":"UNKNOWN",
                                   "sexCertainty":"UNKNOWN"
                                 }
@@ -76,7 +78,31 @@ class PetControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resultType").value("SUCCESS"))
                 .andExpect(jsonPath("$.success.data.id").value(10))
-                .andExpect(jsonPath("$.success.data.name").value("콩이"));
+                .andExpect(jsonPath("$.success.data.name").value("콩이"))
+                .andExpect(jsonPath("$.success.data.adoptedAt").value("2026-04-10"));
+    }
+
+    @Test
+    void returnsDedicatedPetListFieldsWithoutDetailFields() throws Exception {
+        given(queryService.getAll(7L)).willReturn(List.of(new PetListResult(
+                10L, "콩이", 1L, "크레스티드 게코",
+                List.of(new PetResult.MorphItem(2L, "HARLEQUIN", "할리퀸")),
+                "기타 모프", 2L, "준성체", null
+        )));
+
+        mockMvc.perform(get("/api/v1/pets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success.data[0].speciesName").value("크레스티드 게코"))
+                .andExpect(jsonPath("$.success.data[0].lifeStageName").value("준성체"))
+                .andExpect(jsonPath("$.success.data[0].morphs[0].code").value("HARLEQUIN"))
+                .andExpect(jsonPath("$.success.data[0].customMorph").value("기타 모프"))
+                .andExpect(jsonPath("$.success.data[0].photoFileId").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].hatchedAt").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].adoptedAt").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].stageCertainty").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].sex").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].createdAt").doesNotExist())
+                .andExpect(jsonPath("$.success.data[0].updatedAt").doesNotExist());
     }
 
     @Test
@@ -95,7 +121,7 @@ class PetControllerTest {
         mockMvc.perform(patch("/api/v1/pets/10")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"customMorph":null,"hatchedAt":null,"morphIds":[]}
+                                {"customMorph":null,"hatchedAt":null,"adoptedAt":null,"morphIds":[]}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success.data.id").value(10));
@@ -146,7 +172,7 @@ class PetControllerTest {
     private PetResult result() {
         return new PetResult(
                 10L, 1L, "콩이", List.of(), null, LocalDate.of(2026, 3, 2),
-                null, Certainty.UNKNOWN, Sex.UNKNOWN, Certainty.UNKNOWN, null,
+                LocalDate.of(2026, 4, 10), null, Certainty.UNKNOWN, Sex.UNKNOWN, Certainty.UNKNOWN, null,
                 Instant.parse("2026-10-18T00:00:00Z"), Instant.parse("2026-10-18T00:00:00Z")
         );
     }
