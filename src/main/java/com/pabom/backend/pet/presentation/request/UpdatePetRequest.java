@@ -55,10 +55,13 @@ public class UpdatePetRequest {
     @JsonSetter("morphIds")
     public void setMorphIds(List<Long> morphIds) { this.morphIds = morphIds; this.morphIdsPresent = true; }
     @JsonSetter("customMorph")
+    @Schema(description = "기타 모프. 명시적 null이면 삭제", nullable = true)
     public void setCustomMorph(String customMorph) { this.customMorph = customMorph; this.customMorphPresent = true; }
     @JsonSetter("hatchedAt")
+    @Schema(description = "부화일. 명시적 null이면 모름", nullable = true)
     public void setHatchedAt(LocalDate hatchedAt) { this.hatchedAt = hatchedAt; this.hatchedAtPresent = true; }
     @JsonSetter("lifeStageId")
+    @Schema(description = "성장 단계 ID. 명시적 null이면 해제", nullable = true)
     public void setLifeStageId(Long lifeStageId) { this.lifeStageId = lifeStageId; this.lifeStageIdPresent = true; }
     @JsonSetter("stageCertainty")
     public void setStageCertainty(Certainty value) { this.stageCertainty = value; this.stageCertaintyPresent = true; }
@@ -67,6 +70,7 @@ public class UpdatePetRequest {
     @JsonSetter("sexCertainty")
     public void setSexCertainty(Certainty value) { this.sexCertainty = value; this.sexCertaintyPresent = true; }
     @JsonSetter("photoFileId")
+    @Schema(description = "사진 파일 ID. 명시적 null이면 사진 제거", nullable = true)
     public void setPhotoFileId(Long photoFileId) { this.photoFileId = photoFileId; this.photoFileIdPresent = true; }
 
     @JsonIgnore

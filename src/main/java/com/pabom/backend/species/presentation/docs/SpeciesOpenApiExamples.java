@@ -45,10 +45,6 @@ public final class SpeciesOpenApiExamples {
             ]},"error":null,"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/species/3/morphs"}}
             """;
 
-    public static final String INVALID_TOKEN = """
-            {"resultType":"FAIL","success":null,"error":{"code":"INVALID_TOKEN","message":"유효하지 않거나 만료된 인증 토큰입니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/species"}}
-            """;
-
     public static final String SPECIES_NOT_FOUND = """
             {"resultType":"FAIL","success":null,"error":{"code":"SPECIES_NOT_FOUND","message":"종을 찾을 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/species/999/morphs"}}
             """;
