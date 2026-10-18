@@ -20,6 +20,7 @@ class DatabaseMigrationTest {
 
     private static final String INITIAL_VERSION = "20261011000100";
     private static final String FILE_VERSION = "20261017000100";
+    private static final String PET_VERSION = "20261018000100";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -39,6 +40,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 FILE_VERSION
         );
+        Boolean petMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                PET_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -50,12 +56,18 @@ class DatabaseMigrationTest {
 
         assertThat(success).isTrue();
         assertThat(fileMigrationSuccess).isTrue();
+        assertThat(petMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
                 "user_agreements",
                 "events",
-                "files"
+                "files",
+                "species",
+                "morphs",
+                "life_stages",
+                "pets",
+                "pet_morphs"
         );
     }
 
@@ -87,14 +99,41 @@ class DatabaseMigrationTest {
                 "pk_user_agreements",
                 "fk_user_agreements_user",
                 "pk_events",
-                "fk_events_user"
+                "fk_events_user",
+                "pk_species",
+                "uk_species_code",
+                "pk_morphs",
+                "uk_morphs_species_code",
+                "fk_morphs_species",
+                "pk_pets",
+                "uk_pets_user_client_request",
+                "fk_pets_user",
+                "fk_pets_species",
+                "pk_pet_morphs",
+                "fk_pet_morphs_pet",
+                "fk_pet_morphs_morph"
         );
         assertThat(indexes).contains(
                 "idx_refresh_tokens_family_id",
                 "idx_refresh_tokens_user_id",
                 "idx_user_agreements_user_id",
-                "idx_events_user_id"
+                "idx_events_user_id",
+                "idx_morphs_species_id",
+                "idx_pets_user_created_at",
+                "idx_pet_morphs_morph_id"
         );
+    }
+
+    @Test
+    void seedsSpeciesMorphsAndLifeStagesExactlyOnce() {
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM species", Integer.class)).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM morphs", Integer.class)).isEqualTo(17);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM life_stages", Integer.class)).isEqualTo(3);
+
+        flyway.migrate();
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM species", Integer.class)).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM morphs", Integer.class)).isEqualTo(17);
     }
 
     @Test
