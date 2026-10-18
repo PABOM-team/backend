@@ -9,22 +9,35 @@ import com.pabom.backend.pet.domain.type.Sex;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
 
+@Schema(description = "개체 수정 요청. 생략한 필드는 유지하며, nullable 필드의 명시적 null은 값을 삭제합니다.")
 public class UpdatePetRequest {
 
+    @Schema(description = "개체 이름. 생략하면 유지하며 null은 허용하지 않음", example = "콩콩이", minLength = 1, maxLength = 20)
     @Size(max = 20)
     private String name;
+    @Schema(description = "전체 교체할 모프 ID 목록. 생략하면 유지, 빈 배열이면 모두 해제, null은 허용하지 않음",
+            example = "[3]")
     private List<@NotNull Long> morphIds;
+    @Schema(description = "기타 모프. 생략하면 유지, null이면 삭제", example = "트라이컬러", maxLength = 40, nullable = true)
     @Size(max = 40)
     private String customMorph;
+    @Schema(description = "부화일. 생략하면 유지, null이면 모름", example = "2026-03-02",
+            type = "string", format = "date", nullable = true)
     @PastOrPresent
     private LocalDate hatchedAt;
+    @Schema(description = "성장 단계 ID. 생략하면 유지, null이면 해제", example = "1", nullable = true)
     private Long lifeStageId;
+    @Schema(description = "성장 단계 정확성. 생략하면 유지", example = "CONFIRMED")
     private Certainty stageCertainty;
+    @Schema(description = "성별. 생략하면 유지", example = "UNKNOWN")
     private Sex sex;
+    @Schema(description = "성별 정확성. 생략하면 유지", example = "UNKNOWN")
     private Certainty sexCertainty;
+    @Schema(description = "사진 파일 ID. 생략하면 유지, null이면 사진 제거", example = "301", nullable = true)
     private Long photoFileId;
 
     private boolean namePresent;
