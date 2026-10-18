@@ -27,9 +27,11 @@ public record CreatePetRequest(
         @Size(max = 40) String customMorph,
         @Schema(description = "부화일. 모르면 null", example = "2026-03-02", type = "string", format = "date", nullable = true)
         @PastOrPresent LocalDate hatchedAt,
-        @Schema(description = "성장 단계 ID. 모르면 null", example = "1", nullable = true)
+        @Schema(description = "성장 단계 ID. stageCertainty가 CONFIRMED 또는 ESTIMATED이면 필수이며, UNKNOWN이면 null이어야 함",
+                example = "1", nullable = true)
         Long lifeStageId,
-        @Schema(description = "성장 단계 정확성. 생략 또는 null이면 UNKNOWN", example = "CONFIRMED", nullable = true)
+        @Schema(description = "성장 단계 정확성. 생략 또는 null이면 UNKNOWN. UNKNOWN은 lifeStageId null만 허용",
+                example = "CONFIRMED", nullable = true)
         Certainty stageCertainty,
         @Schema(description = "성별. 생략 또는 null이면 UNKNOWN", example = "FEMALE", nullable = true)
         Sex sex,

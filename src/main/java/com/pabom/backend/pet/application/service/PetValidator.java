@@ -5,6 +5,7 @@ import com.pabom.backend.file.domain.repository.FileRepository;
 import com.pabom.backend.file.domain.type.FilePurpose;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.pet.domain.error.PetErrorCode;
+import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.species.domain.entity.Morph;
 import com.pabom.backend.species.domain.error.SpeciesErrorCode;
 import com.pabom.backend.species.domain.repository.LifeStageRepository;
@@ -89,7 +90,14 @@ public class PetValidator {
         }
     }
 
-    public void validateLifeStage(Long lifeStageId) {
+    public void validateLifeStage(Long lifeStageId, Certainty stageCertainty) {
+        if (stageCertainty == Certainty.UNKNOWN && lifeStageId != null) {
+            throw new BusinessException(SpeciesErrorCode.LIFE_STAGE_INVALID);
+        }
+        if ((stageCertainty == Certainty.CONFIRMED || stageCertainty == Certainty.ESTIMATED)
+                && lifeStageId == null) {
+            throw new BusinessException(PetErrorCode.STAGE_REQUIRED);
+        }
         if (lifeStageId != null && !lifeStageRepository.existsById(lifeStageId)) {
             throw new BusinessException(SpeciesErrorCode.LIFE_STAGE_INVALID);
         }

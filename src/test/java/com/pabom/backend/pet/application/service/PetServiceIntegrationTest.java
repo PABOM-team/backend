@@ -18,6 +18,7 @@ import com.pabom.backend.pet.domain.type.Sex;
 import com.pabom.backend.pet.infrastructure.persistence.PetJpaRepository;
 import com.pabom.backend.species.domain.entity.Morph;
 import com.pabom.backend.species.domain.entity.Species;
+import com.pabom.backend.species.domain.error.SpeciesErrorCode;
 import com.pabom.backend.species.infrastructure.persistence.LifeStageJpaRepository;
 import com.pabom.backend.species.infrastructure.persistence.MorphJpaRepository;
 import com.pabom.backend.species.infrastructure.persistence.SpeciesJpaRepository;
@@ -233,6 +234,48 @@ class PetServiceIntegrationTest {
                         assertThat(exception.errorCode()).isEqualTo(PetErrorCode.MORPH_COMBINATION_INVALID));
     }
 
+    @Test
+    void validatesLifeStageCombinationsOnCreate() {
+        Long adultId = adultId();
+
+        assertError(withStage(command(List.of(), null), null, Certainty.CONFIRMED), PetErrorCode.STAGE_REQUIRED);
+        assertError(withStage(command(List.of(), null), null, Certainty.ESTIMATED), PetErrorCode.STAGE_REQUIRED);
+        assertThat(commandService.create(owner.getId(),
+                withStage(command(List.of(), null), null, Certainty.UNKNOWN)).lifeStageId()).isNull();
+        assertError(withStage(command(List.of(), null), adultId, Certainty.UNKNOWN),
+                SpeciesErrorCode.LIFE_STAGE_INVALID);
+        assertThat(commandService.create(owner.getId(),
+                withStage(command(List.of(), null), adultId, Certainty.CONFIRMED)).lifeStageId())
+                .isEqualTo(adultId);
+        assertThat(commandService.create(owner.getId(),
+                withStage(command(List.of(), null), adultId, Certainty.ESTIMATED)).lifeStageId())
+                .isEqualTo(adultId);
+        assertError(withStage(command(List.of(), null), 999L, Certainty.CONFIRMED),
+                SpeciesErrorCode.LIFE_STAGE_INVALID);
+    }
+
+    @Test
+    void validatesMergedLifeStageStateOnPatch() {
+        Long adultId = adultId();
+        PetResult created = commandService.create(owner.getId(),
+                withStage(command(List.of(), null), adultId, Certainty.CONFIRMED));
+
+        assertUpdateError(created.id(), stagePatch(PatchValue.absent(), PatchValue.of(Certainty.UNKNOWN)),
+                SpeciesErrorCode.LIFE_STAGE_INVALID);
+        assertUpdateError(created.id(), stagePatch(PatchValue.of(null), PatchValue.absent()),
+                PetErrorCode.STAGE_REQUIRED);
+
+        PetResult unknown = commandService.update(owner.getId(), created.id(),
+                stagePatch(PatchValue.of(null), PatchValue.of(Certainty.UNKNOWN)));
+        assertThat(unknown.lifeStageId()).isNull();
+        assertThat(unknown.stageCertainty()).isEqualTo(Certainty.UNKNOWN);
+
+        PetResult estimated = commandService.update(owner.getId(), created.id(),
+                stagePatch(PatchValue.of(adultId), PatchValue.of(Certainty.ESTIMATED)));
+        assertThat(estimated.lifeStageId()).isEqualTo(adultId);
+        assertThat(estimated.stageCertainty()).isEqualTo(Certainty.ESTIMATED);
+    }
+
     private CreatePetCommand command(List<Long> morphIds, String customMorph) {
         return command(UUID.randomUUID(), morphIds, customMorph);
     }
@@ -261,6 +304,41 @@ class PetServiceIntegrationTest {
         );
     }
 
+    private CreatePetCommand withStage(
+            CreatePetCommand source,
+            Long lifeStageId,
+            Certainty stageCertainty
+    ) {
+        return new CreatePetCommand(
+                UUID.randomUUID(), source.speciesId(), source.name(), source.morphIds(),
+                source.customMorph(), source.hatchedAt(), lifeStageId, stageCertainty,
+                source.sex(), source.sexCertainty(), source.photoFileId()
+        );
+    }
+
+    private UpdatePetCommand stagePatch(
+            PatchValue<Long> lifeStageId,
+            PatchValue<Certainty> stageCertainty
+    ) {
+        return new UpdatePetCommand(
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent(), PatchValue.absent(),
+                lifeStageId, stageCertainty,
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent()
+        );
+    }
+
+    private void assertUpdateError(Long petId, UpdatePetCommand command, Object errorCode) {
+        assertThatThrownBy(() -> commandService.update(owner.getId(), petId, command))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(errorCode));
+    }
+
+    private Long adultId() {
+        return lifeStageRepository.findAll().stream()
+                .filter(stage -> stage.getCode().equals("ADULT"))
+                .findFirst().orElseThrow().getId();
+    }
+
     private Species species(String code) {
         return speciesRepository.findAll().stream()
                 .filter(item -> item.getCode().equals(code))
@@ -271,7 +349,7 @@ class PetServiceIntegrationTest {
         return crestedMorphs.stream().filter(item -> item.getCode().equals(code)).findFirst().orElseThrow();
     }
 
-    private void assertError(CreatePetCommand command, PetErrorCode errorCode) {
+    private void assertError(CreatePetCommand command, Object errorCode) {
         assertThatThrownBy(() -> commandService.create(owner.getId(), command))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(errorCode));

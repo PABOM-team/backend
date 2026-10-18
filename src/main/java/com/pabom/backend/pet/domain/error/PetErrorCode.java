@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 public enum PetErrorCode implements BaseErrorCode {
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "PET_NOT_FOUND", "개체를 찾을 수 없습니다."),
     PET_NAME_INVALID(HttpStatus.BAD_REQUEST, "PET_NAME_INVALID", "개체 이름은 1자 이상 20자 이하여야 합니다."),
+    STAGE_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "STAGE_REQUIRED", "성장 단계 정확성이 확정 또는 추정이면 성장 단계가 필요합니다."),
     MORPH_INVALID(HttpStatus.BAD_REQUEST, "MORPH_INVALID", "해당 종에서 선택할 수 없는 모프입니다."),
     MORPH_DUPLICATED(HttpStatus.BAD_REQUEST, "MORPH_DUPLICATED", "동일한 모프를 중복 선택할 수 없습니다."),
     MORPH_COMBINATION_INVALID(HttpStatus.BAD_REQUEST, "MORPH_COMBINATION_INVALID", "노멀 모프는 단독으로만 선택할 수 있습니다."),

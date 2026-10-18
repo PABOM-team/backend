@@ -15,6 +15,7 @@ import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.PET_NAM
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.PET_NOT_FOUND;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.PET_PHOTO_INVALID;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.SPECIES_NOT_FOUND;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.STAGE_REQUIRED;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_REQUEST;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_SUCCESS;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.VALIDATION_FAILED;
@@ -85,7 +86,6 @@ public class PetController {
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
                             examples = {
                                     @ExampleObject(name = "VALIDATION_FAILED", value = VALIDATION_FAILED),
-                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID),
                                     @ExampleObject(name = "MORPH_INVALID", value = MORPH_INVALID),
                                     @ExampleObject(name = "MORPH_DUPLICATED", value = MORPH_DUPLICATED),
                                     @ExampleObject(name = "MORPH_COMBINATION_INVALID", value = MORPH_COMBINATION_INVALID),
@@ -101,7 +101,14 @@ public class PetController {
             @ApiResponse(responseCode = "404", description = "SPECIES_NOT_FOUND",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
-                            examples = @ExampleObject(name = "SPECIES_NOT_FOUND", value = SPECIES_NOT_FOUND)))
+                            examples = @ExampleObject(name = "SPECIES_NOT_FOUND", value = SPECIES_NOT_FOUND))),
+            @ApiResponse(responseCode = "422", description = "성장 단계와 정확성 조합 검증 실패",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "STAGE_REQUIRED", value = STAGE_REQUIRED),
+                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID)
+                            }))
     })
     public ResponseEntity<ApiResponseBody<PetResponse>> create(
             @Valid @RequestBody CreatePetRequest body,
@@ -189,7 +196,6 @@ public class PetController {
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
                             examples = {
                                     @ExampleObject(name = "VALIDATION_FAILED", value = VALIDATION_FAILED),
-                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID),
                                     @ExampleObject(name = "MORPH_INVALID", value = MORPH_INVALID),
                                     @ExampleObject(name = "MORPH_DUPLICATED", value = MORPH_DUPLICATED),
                                     @ExampleObject(name = "MORPH_COMBINATION_INVALID", value = MORPH_COMBINATION_INVALID),
@@ -205,7 +211,14 @@ public class PetController {
             @ApiResponse(responseCode = "404", description = "PET_NOT_FOUND. 타인 소유 개체도 동일하게 처리합니다.",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
-                            examples = @ExampleObject(name = "PET_NOT_FOUND", value = PET_NOT_FOUND)))
+                            examples = @ExampleObject(name = "PET_NOT_FOUND", value = PET_NOT_FOUND))),
+            @ApiResponse(responseCode = "422", description = "성장 단계와 정확성의 최종 조합 검증 실패",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "STAGE_REQUIRED", value = STAGE_REQUIRED),
+                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID)
+                            }))
     })
     public ResponseEntity<ApiResponseBody<PetResponse>> update(
             @PathVariable Long petId,

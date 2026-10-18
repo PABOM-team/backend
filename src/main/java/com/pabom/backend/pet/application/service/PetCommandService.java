@@ -44,10 +44,10 @@ public class PetCommandService {
         List<Morph> morphs = validator.resolveMorphs(command.speciesId(), command.morphIds());
         validator.validateMorphCombination(morphs, customMorph);
         validator.validateHatchedAt(command.hatchedAt());
-        validator.validateLifeStage(command.lifeStageId());
         validator.validatePhoto(command.photoFileId(), userId);
 
         Certainty stageCertainty = defaultCertainty(command.stageCertainty());
+        validator.validateLifeStage(command.lifeStageId(), stageCertainty);
         Sex sex = command.sex() == null ? Sex.UNKNOWN : command.sex();
         Certainty sexCertainty = defaultCertainty(command.sexCertainty());
         Instant now = clock.instant();
@@ -87,6 +87,14 @@ public class PetCommandService {
         }
         validator.validateMorphCombination(finalMorphs, finalCustomMorph);
 
+        Long finalLifeStageId = command.lifeStageId().present()
+                ? command.lifeStageId().value()
+                : pet.getLifeStageId();
+        Certainty finalStageCertainty = command.stageCertainty().present()
+                ? requireValue(command.stageCertainty().value())
+                : pet.getStageCertainty();
+        validator.validateLifeStage(finalLifeStageId, finalStageCertainty);
+
         Instant now = clock.instant();
         if (command.name().present()) {
             pet.updateName(validator.normalizeName(command.name().value()), now);
@@ -102,11 +110,10 @@ public class PetCommandService {
             pet.updateHatchedAt(command.hatchedAt().value(), now);
         }
         if (command.lifeStageId().present()) {
-            validator.validateLifeStage(command.lifeStageId().value());
             pet.updateLifeStage(command.lifeStageId().value(), now);
         }
         if (command.stageCertainty().present()) {
-            pet.updateStageCertainty(requireValue(command.stageCertainty().value()), now);
+            pet.updateStageCertainty(finalStageCertainty, now);
         }
         if (command.sex().present()) {
             pet.updateSex(requireValue(command.sex().value()), now);

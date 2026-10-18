@@ -29,9 +29,11 @@ public class UpdatePetRequest {
             type = "string", format = "date", nullable = true)
     @PastOrPresent
     private LocalDate hatchedAt;
-    @Schema(description = "성장 단계 ID. 생략하면 유지, null이면 해제", example = "1", nullable = true)
+    @Schema(description = "성장 단계 ID. 생략하면 유지, null이면 해제. 최종 정확성이 CONFIRMED/ESTIMATED이면 필수",
+            example = "1", nullable = true)
     private Long lifeStageId;
-    @Schema(description = "성장 단계 정확성. 생략하면 유지", example = "CONFIRMED")
+    @Schema(description = "성장 단계 정확성. 생략하면 유지. UNKNOWN이면 최종 lifeStageId는 null이어야 함",
+            example = "CONFIRMED")
     private Certainty stageCertainty;
     @Schema(description = "성별. 생략하면 유지", example = "UNKNOWN")
     private Sex sex;
@@ -61,7 +63,7 @@ public class UpdatePetRequest {
     @Schema(description = "부화일. 명시적 null이면 모름", nullable = true)
     public void setHatchedAt(LocalDate hatchedAt) { this.hatchedAt = hatchedAt; this.hatchedAtPresent = true; }
     @JsonSetter("lifeStageId")
-    @Schema(description = "성장 단계 ID. 명시적 null이면 해제", nullable = true)
+    @Schema(description = "성장 단계 ID. 명시적 null이면 해제하며 최종 정확성과 함께 검증", nullable = true)
     public void setLifeStageId(Long lifeStageId) { this.lifeStageId = lifeStageId; this.lifeStageIdPresent = true; }
     @JsonSetter("stageCertainty")
     public void setStageCertainty(Certainty value) { this.stageCertainty = value; this.stageCertaintyPresent = true; }

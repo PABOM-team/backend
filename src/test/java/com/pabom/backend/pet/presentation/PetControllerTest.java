@@ -10,12 +10,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pabom.backend.global.error.GlobalExceptionHandler;
+import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.security.AuthUser;
 import com.pabom.backend.pet.application.result.PetResult;
 import com.pabom.backend.pet.application.service.PetCommandService;
 import com.pabom.backend.pet.application.service.PetQueryService;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
+import com.pabom.backend.pet.domain.error.PetErrorCode;
+import com.pabom.backend.species.domain.error.SpeciesErrorCode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -105,6 +108,39 @@ class PetControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void returns422WhenConfirmedStageHasNoLifeStageId() throws Exception {
+        given(commandService.create(eq(7L), any()))
+                .willThrow(new BusinessException(PetErrorCode.STAGE_REQUIRED));
+
+        mockMvc.perform(post("/api/v1/pets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientRequestId":"550e8400-e29b-41d4-a716-446655440099",
+                                  "speciesId":1,
+                                  "name":"콩이",
+                                  "stageCertainty":"CONFIRMED"
+                                }
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("STAGE_REQUIRED"));
+    }
+
+    @Test
+    void returns422ForInvalidLifeStageOnPatch() throws Exception {
+        given(commandService.update(eq(7L), eq(10L), any()))
+                .willThrow(new BusinessException(SpeciesErrorCode.LIFE_STAGE_INVALID));
+
+        mockMvc.perform(patch("/api/v1/pets/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"lifeStageId":999,"stageCertainty":"CONFIRMED"}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("LIFE_STAGE_INVALID"));
     }
 
     private PetResult result() {

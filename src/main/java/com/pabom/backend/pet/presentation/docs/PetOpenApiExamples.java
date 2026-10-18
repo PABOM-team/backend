@@ -44,6 +44,9 @@ public final class PetOpenApiExamples {
     public static final String LIFE_STAGE_INVALID = """
             {"resultType":"FAIL","success":null,"error":{"code":"LIFE_STAGE_INVALID","message":"유효하지 않은 성장 단계입니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;
+    public static final String STAGE_REQUIRED = """
+            {"resultType":"FAIL","success":null,"error":{"code":"STAGE_REQUIRED","message":"성장 단계 정확성이 확정 또는 추정이면 성장 단계가 필요합니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
+            """;
     public static final String MORPH_INVALID = """
             {"resultType":"FAIL","success":null,"error":{"code":"MORPH_INVALID","message":"해당 종에서 선택할 수 없는 모프입니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;

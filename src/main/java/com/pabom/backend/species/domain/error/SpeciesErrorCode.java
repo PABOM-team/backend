@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum SpeciesErrorCode implements BaseErrorCode {
     SPECIES_NOT_FOUND(HttpStatus.NOT_FOUND, "SPECIES_NOT_FOUND", "종을 찾을 수 없습니다."),
-    LIFE_STAGE_INVALID(HttpStatus.BAD_REQUEST, "LIFE_STAGE_INVALID", "유효하지 않은 성장 단계입니다.");
+    LIFE_STAGE_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "LIFE_STAGE_INVALID", "유효하지 않은 성장 단계입니다.");
 
     private final HttpStatus status;
     private final String code;
