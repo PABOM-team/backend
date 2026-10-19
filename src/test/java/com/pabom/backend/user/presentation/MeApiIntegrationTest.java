@@ -43,18 +43,18 @@ class MeApiIntegrationTest {
         user = users.saveAndFlush(user);
         String accessToken = tokens.issueAccessToken(user.getId(), clock.instant()).value();
 
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success.data.role").value("USER"));
-        mockMvc.perform(delete("/api/v1/me")
+        mockMvc.perform(delete("/api/v1/users/me")
                         .header(HttpHeaders.ORIGIN, "http://localhost:3000")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"confirm\":true}"))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("USER_WITHDRAWN"));
@@ -66,14 +66,14 @@ class MeApiIntegrationTest {
         String expired = jwtFactory.create(1L, TokenType.ACCESS, issuedAt,
                 issuedAt.plusSeconds(60));
 
-        mockMvc.perform(get("/api/v1/me"))
+        mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + expired))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("TOKEN_EXPIRED"));
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer forged.token.value"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("TOKEN_INVALID"));

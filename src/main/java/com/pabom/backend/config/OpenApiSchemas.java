@@ -5,6 +5,7 @@ import com.pabom.backend.pet.presentation.response.PetResponse;
 import com.pabom.backend.pet.presentation.response.PetListResponse;
 import com.pabom.backend.species.presentation.response.MorphResponse;
 import com.pabom.backend.species.presentation.response.SpeciesResponse;
+import com.pabom.backend.user.presentation.response.UserProfileResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,6 +62,18 @@ public final class OpenApiSchemas {
     }
 
     public record PetListSuccess(List<PetListResponse> data) {
+    }
+
+    @Schema(name = "UserProfileApiResponse")
+    public record UserProfileEnvelope(
+            @Schema(example = "SUCCESS") ResultType resultType,
+            UserProfileSuccess success,
+            @Schema(nullable = true) ErrorData error,
+            MetaData meta
+    ) {
+    }
+
+    public record UserProfileSuccess(UserProfileResponse data) {
     }
 
     @Schema(name = "ErrorApiResponse")

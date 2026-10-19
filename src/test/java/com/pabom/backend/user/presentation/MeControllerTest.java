@@ -35,7 +35,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class MeControllerTest {
+class UserControllerTest {
 
     private UserProfileService profileService;
     private WithdrawalService withdrawalService;
@@ -48,7 +48,7 @@ class MeControllerTest {
         RefreshTokenCookieManager cookies = new RefreshTokenCookieManager(new AuthWebProperties(
                 List.of("http://localhost"), false, "Lax"));
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new MeController(profileService, withdrawalService, cookies))
+                        new UserController(profileService, withdrawalService, cookies))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -65,7 +65,7 @@ class MeControllerTest {
                 false, new PetCount(2, 1), Instant.parse("2026-10-17T02:00:00Z")
         ));
 
-        mockMvc.perform(get("/api/v1/me"))
+        mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success.data.id").value(101))
                 .andExpect(jsonPath("$.success.data.status").value("PENDING_TERMS"))
@@ -78,15 +78,15 @@ class MeControllerTest {
     @Test
     void distinguishesMissingExpiredAndInvalidAuthentication() throws Exception {
         SecurityContextHolder.clearContext();
-        mockMvc.perform(get("/api/v1/me"))
+        mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("AUTH_REQUIRED"));
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .requestAttr(JwtAuthenticationFilter.AUTH_ERROR_ATTRIBUTE,
                                 AuthErrorCode.TOKEN_EXPIRED))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("TOKEN_EXPIRED"));
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/users/me")
                         .requestAttr(JwtAuthenticationFilter.AUTH_ERROR_ATTRIBUTE,
                                 AuthErrorCode.TOKEN_INVALID))
                 .andExpect(status().isUnauthorized())
@@ -96,7 +96,7 @@ class MeControllerTest {
     @Test
     void rejectsMissingNullOrFalseConfirmationWith422() throws Exception {
         for (String body : List.of("{}", "{\"confirm\":null}", "{\"confirm\":false}")) {
-            mockMvc.perform(delete("/api/v1/me")
+            mockMvc.perform(delete("/api/v1/users/me")
                             .contentType(MediaType.APPLICATION_JSON).content(body))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.error.code").value("CONFIRM_REQUIRED"));
@@ -105,7 +105,7 @@ class MeControllerTest {
 
     @Test
     void withdrawsAndClearsRefreshCookieWithNoBody() throws Exception {
-        mockMvc.perform(delete("/api/v1/me")
+        mockMvc.perform(delete("/api/v1/users/me")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"confirm\":true}"))
                 .andExpect(status().isNoContent())
