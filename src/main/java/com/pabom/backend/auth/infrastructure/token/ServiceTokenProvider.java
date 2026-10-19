@@ -4,6 +4,7 @@ import com.pabom.backend.auth.application.port.ServiceTokenPort;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.global.error.BusinessException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -64,7 +65,13 @@ public class ServiceTokenProvider implements ServiceTokenPort {
 
     @Override
     public Long validateAccessToken(String token) {
-        return validate(token, TokenType.ACCESS);
+        try {
+            return validateAndGetUserId(token, TokenType.ACCESS);
+        } catch (ExpiredJwtException exception) {
+            throw new BusinessException(AuthErrorCode.TOKEN_EXPIRED, exception);
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new BusinessException(AuthErrorCode.TOKEN_INVALID, exception);
+        }
     }
 
     @Override

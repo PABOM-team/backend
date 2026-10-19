@@ -5,4 +5,6 @@ import com.pabom.backend.event.domain.entity.LoginEvent;
 public interface LoginEventRepository {
 
     LoginEvent save(LoginEvent loginEvent);
+
+    void anonymizeByUserId(Long userId);
 }

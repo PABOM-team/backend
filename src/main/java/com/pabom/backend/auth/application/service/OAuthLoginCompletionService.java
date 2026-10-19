@@ -85,7 +85,7 @@ public class OAuthLoginCompletionService {
 
     private UserLookup findOrCreateUser(OAuthLoginResult socialLogin, Instant loginAt) {
         return userRepository
-                .findByProviderAndProviderId(socialLogin.provider(), socialLogin.providerId())
+                .findByProviderAndProviderIdForUpdate(socialLogin.provider(), socialLogin.providerId())
                 .map(user -> new UserLookup(user, false))
                 .orElseGet(() -> {
                     String nickname = StringUtils.hasText(socialLogin.nickname())

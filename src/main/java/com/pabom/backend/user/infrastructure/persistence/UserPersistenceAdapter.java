@@ -27,6 +27,19 @@ public class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByProviderAndProviderIdForUpdate(
+            OAuthProvider provider,
+            String providerId
+    ) {
+        return userJpaRepository.findByProviderAndProviderIdForUpdate(provider, providerId);
+    }
+
+    @Override
+    public Optional<User> findByIdForUpdate(Long id) {
+        return userJpaRepository.findByIdForUpdate(id);
+    }
+
+    @Override
     public User save(User user) {
         return userJpaRepository.save(user);
     }

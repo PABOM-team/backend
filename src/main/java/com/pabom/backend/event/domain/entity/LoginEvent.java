@@ -25,7 +25,7 @@ public class LoginEvent {
     @Column(name = "event_name", nullable = false, length = 100)
     private String eventName;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(name = "is_new_user", nullable = false)

@@ -59,7 +59,7 @@ class AuthSessionControllerIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .header(HttpHeaders.ORIGIN, "https://attacker.example")
                         .cookie(new Cookie("pabom_rt", "refresh-token")))
-                .andExpect(status().isForbidden())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("ORIGIN_NOT_ALLOWED"));
     }
 

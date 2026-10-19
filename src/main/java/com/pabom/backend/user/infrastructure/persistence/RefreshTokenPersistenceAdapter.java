@@ -27,4 +27,14 @@ public class RefreshTokenPersistenceAdapter implements RefreshTokenRepository {
     public void revokeFamily(String familyId, Instant revokedAt) {
         refreshTokenJpaRepository.revokeFamily(familyId, revokedAt);
     }
+
+    @Override
+    public void revokeAllByUserId(Long userId, Instant revokedAt) {
+        refreshTokenJpaRepository.revokeAllByUserId(userId, revokedAt);
+    }
+
+    @Override
+    public void deleteAllByUserId(Long userId) {
+        refreshTokenJpaRepository.deleteAllByUserId(userId);
+    }
 }

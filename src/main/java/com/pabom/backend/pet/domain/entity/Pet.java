@@ -2,6 +2,7 @@ package com.pabom.backend.pet.domain.entity;
 
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
+import com.pabom.backend.pet.domain.type.PetStatus;
 import com.pabom.backend.species.domain.entity.Morph;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -85,6 +86,10 @@ public class Pet {
     @Column(name = "photo_file_id")
     private Long photoFileId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private PetStatus status;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -124,6 +129,7 @@ public class Pet {
         pet.sex = sex;
         pet.sexCertainty = sexCertainty;
         pet.photoFileId = photoFileId;
+        pet.status = PetStatus.ACTIVE;
         pet.createdAt = now;
         pet.updatedAt = now;
         return pet;
@@ -200,6 +206,7 @@ public class Pet {
     public Sex getSex() { return sex; }
     public Certainty getSexCertainty() { return sexCertainty; }
     public Long getPhotoFileId() { return photoFileId; }
+    public PetStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
