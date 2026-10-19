@@ -16,4 +16,14 @@ public class UserAgreementPersistenceAdapter implements UserAgreementRepository 
     public void saveAll(List<UserAgreement> agreements) {
         repository.saveAll(agreements);
     }
+
+    @Override
+    public List<UserAgreement> findAllByUserId(Long userId) {
+        return repository.findAllByUserIdOrderByAgreedAtDesc(userId);
+    }
+
+    @Override
+    public void deleteAllByUserId(Long userId) {
+        repository.deleteAllByUserId(userId);
+    }
 }

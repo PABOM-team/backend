@@ -1,6 +1,7 @@
 package com.pabom.backend.auth.presentation;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -60,7 +61,14 @@ class AuthSessionControllerIntegrationTest {
                         .header(HttpHeaders.ORIGIN, "https://attacker.example")
                         .cookie(new Cookie("pabom_rt", "refresh-token")))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("ORIGIN_NOT_ALLOWED"));
+                .andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$.resultType").value("FAIL"))
+                .andExpect(jsonPath("$.success").doesNotExist())
+                .andExpect(jsonPath("$.error.code").value("ORIGIN_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.error.message").value("허용되지 않은 Origin입니다."))
+                .andExpect(jsonPath("$.meta.path").value("/api/v1/auth/refresh"));
+
+        verifyNoInteractions(authSessionService);
     }
 
     @Test

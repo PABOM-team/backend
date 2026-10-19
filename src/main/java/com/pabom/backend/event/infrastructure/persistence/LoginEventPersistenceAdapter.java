@@ -15,4 +15,9 @@ public class LoginEventPersistenceAdapter implements LoginEventRepository {
     public LoginEvent save(LoginEvent loginEvent) {
         return loginEventJpaRepository.save(loginEvent);
     }
+
+    @Override
+    public void anonymizeByUserId(Long userId) {
+        loginEventJpaRepository.anonymizeByUserId(userId);
+    }
 }

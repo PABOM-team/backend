@@ -8,6 +8,21 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum AuthErrorCode implements BaseErrorCode {
+    AUTH_REQUIRED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_REQUIRED",
+            "인증이 필요합니다."
+    ),
+    TOKEN_EXPIRED(
+            HttpStatus.UNAUTHORIZED,
+            "TOKEN_EXPIRED",
+            "Access Token이 만료되었습니다."
+    ),
+    TOKEN_INVALID(
+            HttpStatus.UNAUTHORIZED,
+            "TOKEN_INVALID",
+            "Access Token이 유효하지 않습니다."
+    ),
     UNSUPPORTED_OAUTH_PROVIDER(
             HttpStatus.BAD_REQUEST,
             "UNSUPPORTED_OAUTH_PROVIDER",
@@ -34,7 +49,7 @@ public enum AuthErrorCode implements BaseErrorCode {
             "이미 사용된 리프레시 토큰입니다."
     ),
     USER_WITHDRAWN(
-            HttpStatus.FORBIDDEN,
+            HttpStatus.UNAUTHORIZED,
             "USER_WITHDRAWN",
             "탈퇴한 사용자입니다."
     ),

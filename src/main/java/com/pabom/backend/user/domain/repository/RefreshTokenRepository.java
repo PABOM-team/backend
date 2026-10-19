@@ -11,4 +11,8 @@ public interface RefreshTokenRepository {
     Optional<RefreshToken> findByTokenHashForUpdate(String tokenHash);
 
     void revokeFamily(String familyId, Instant revokedAt);
+
+    void revokeAllByUserId(Long userId, Instant revokedAt);
+
+    void deleteAllByUserId(Long userId);
 }
