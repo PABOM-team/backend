@@ -6,6 +6,7 @@ import com.pabom.backend.pet.presentation.response.PetListResponse;
 import com.pabom.backend.species.presentation.response.MorphResponse;
 import com.pabom.backend.species.presentation.response.SpeciesResponse;
 import com.pabom.backend.user.presentation.response.UserProfileResponse;
+import com.pabom.backend.record.presentation.response.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -75,6 +76,26 @@ public final class OpenApiSchemas {
 
     public record UserProfileSuccess(UserProfileResponse data) {
     }
+
+    @Schema(name = "RecordListApiResponse")
+    public record RecordListEnvelope(ResultType resultType, RecordListSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RecordListSuccess(RecordListResponse data) {}
+
+    @Schema(name = "RecordMutationApiResponse")
+    public record RecordMutationEnvelope(ResultType resultType, RecordMutationSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RecordMutationSuccess(RecordMutationResponse data) {}
+
+    @Schema(name = "RecordDetailApiResponse")
+    public record RecordDetailEnvelope(ResultType resultType, RecordDetailSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RecordDetailSuccess(RecordDetailResponse data) {}
+
+    @Schema(name = "DeleteRecordApiResponse")
+    public record DeleteRecordEnvelope(ResultType resultType, DeleteRecordSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record DeleteRecordSuccess(DeleteRecordResponse data) {}
 
     @Schema(name = "ErrorApiResponse")
     public record ErrorEnvelope(
