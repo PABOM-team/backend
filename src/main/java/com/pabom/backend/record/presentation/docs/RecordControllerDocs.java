@@ -16,7 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Record", description = "기록 목록·추가·상세·정정·삭제·복구 API")
+@Tag(name = "Record", description = "기록 관련 API")
 public interface RecordControllerDocs {
     @Operation(summary = "기록 목록 조회", description = "occurredAt DESC, id DESC 커서 페이지네이션. includeDeleted=true인 경우 최근 30일 내 삭제 기록을 포함합니다.", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
     @ApiResponses({
