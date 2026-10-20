@@ -22,6 +22,7 @@ class DatabaseMigrationTest {
     private static final String FILE_VERSION = "20261017000100";
     private static final String PET_VERSION = "20261018000100";
     private static final String ADOPTED_AT_VERSION = "20261018000200";
+    private static final String RECORD_VERSION = "20261020000100";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -51,6 +52,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 ADOPTED_AT_VERSION
         );
+        Boolean recordMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                RECORD_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -64,6 +70,7 @@ class DatabaseMigrationTest {
         assertThat(fileMigrationSuccess).isTrue();
         assertThat(petMigrationSuccess).isTrue();
         assertThat(adoptedAtMigrationSuccess).isTrue();
+        assertThat(recordMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
@@ -74,7 +81,11 @@ class DatabaseMigrationTest {
                 "morphs",
                 "life_stages",
                 "pets",
-                "pet_morphs"
+                "pet_morphs",
+                "care_items",
+                "routines",
+                "care_records",
+                "care_record_revisions"
         );
     }
 
@@ -135,6 +146,13 @@ class DatabaseMigrationTest {
                 "pk_pet_morphs",
                 "fk_pet_morphs_pet",
                 "fk_pet_morphs_morph"
+                ,"pk_care_items",
+                "uk_care_items_code",
+                "pk_routines",
+                "pk_care_records",
+                "uk_care_records_user_client_request",
+                "pk_care_record_revisions",
+                "fk_care_record_revisions_record"
         );
         assertThat(indexes).contains(
                 "idx_refresh_tokens_family_id",
@@ -144,6 +162,9 @@ class DatabaseMigrationTest {
                 "idx_morphs_species_id",
                 "idx_pets_user_created_at",
                 "idx_pet_morphs_morph_id"
+                ,"idx_routines_pet_active",
+                "idx_care_records_user_occurred",
+                "idx_care_record_revisions_record"
         );
     }
 
@@ -162,5 +183,17 @@ class DatabaseMigrationTest {
     @Test
     void doesNotRunVersionedMigrationTwice() {
         assertThat(flyway.migrate().migrationsExecuted).isZero();
+    }
+
+    @Test
+    void seedsOnlyRecordItemMetadataWithoutInventingGuidelineRanges() {
+        assertThat(jdbcTemplate.queryForList(
+                "select code from care_items order by id", String.class))
+                .containsExactly("FEEDING", "WEIGHT", "SHED", "MEMO");
+        var weight = jdbcTemplate.queryForMap(
+                "select unit,min_value,max_value from care_items where code='WEIGHT'");
+        assertThat(weight.get("UNIT")).isEqualTo("g");
+        assertThat(weight.get("MIN_VALUE")).isNull();
+        assertThat(weight.get("MAX_VALUE")).isNull();
     }
 }
