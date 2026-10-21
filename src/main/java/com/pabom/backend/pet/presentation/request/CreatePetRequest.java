@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreatePetRequest(
-        @Schema(description = "중복 등록 방지용 요청 UUID", example = "550e8400-e29b-41d4-a716-446655440000",
+        @Schema(description = "중복 등록 방지용 요청 UUID. 새 등록 시 새 UUID를 권장하며, 삭제된 개체의 UUID 재사용은 새 개체 등록으로 처리됩니다.", example = "550e8400-e29b-41d4-a716-446655440000",
                 requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull UUID clientRequestId,
         @Schema(description = "종 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)

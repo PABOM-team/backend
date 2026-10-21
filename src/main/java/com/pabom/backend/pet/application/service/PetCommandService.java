@@ -15,7 +15,9 @@ import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaReposito
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,9 +40,13 @@ public class PetCommandService {
         Pet existing = petRepository.findByUserIdAndClientRequestIdForUpdate(userId, requestId).orElse(null);
         if (existing != null) {
             if (existing.getDeletedAt() != null) {
-                throw new BusinessException(PetErrorCode.PET_NOT_FOUND);
+                existing.retireClientRequestId(retiredRequestId(existing));
+                // Release the unique (user_id, client_request_id) key before inserting
+                // the replacement. The update is rolled back if later validation fails.
+                petRepository.save(existing);
+            } else {
+                return PetResult.from(existing);
             }
-            return PetResult.from(existing);
         }
 
         validator.validateSpecies(command.speciesId());
@@ -150,6 +156,11 @@ public class PetCommandService {
 
     private Certainty defaultCertainty(Certainty certainty) {
         return certainty == null ? Certainty.UNKNOWN : certainty;
+    }
+
+    private String retiredRequestId(Pet pet) {
+        String source = "deleted-pet:" + pet.getId() + ":" + pet.getClientRequestId();
+        return UUID.nameUUIDFromBytes(source.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private <T> T requireValue(T value) {
