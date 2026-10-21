@@ -13,4 +13,9 @@ public interface CareRecordRevisionJpaRepository extends JpaRepository<CareRecor
     @Query("delete from CareRecordRevision r where r.careRecordId in "
             + "(select c.id from CareRecord c where c.userId=:userId)")
     void deleteAllByUserId(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from CareRecordRevision r where r.careRecordId in "
+            + "(select c.id from CareRecord c where c.petId=:petId)")
+    void deleteAllByPetId(@Param("petId") Long petId);
 }

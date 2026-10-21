@@ -20,6 +20,8 @@ import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.STAGE_R
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_REQUEST;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_SUCCESS;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.VALIDATION_FAILED;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.DELETE_INVALID_TOKEN;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.DELETE_PET_NOT_FOUND;
 
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.config.SwaggerConfig;
@@ -49,6 +51,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,7 +62,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/pets")
 @RequiredArgsConstructor
-@Tag(name = "Pet", description = "파충류 개체 등록 및 조회 API")
+@Tag(name = "Pet", description = "개체 관련 API")
 public class PetController {
 
     private final PetCommandService commandService;
@@ -235,6 +238,32 @@ public class PetController {
                 PetResponse.from(commandService.update(authUser.userId(), petId, body.toCommand())),
                 request
         ));
+    }
+
+    @DeleteMapping("/{petId}")
+    @Operation(
+            summary = "개체 삭제",
+            description = "소유 개체와 활성 기록을 Soft Delete합니다.",
+            security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION)
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제 성공", content = @Content),
+            @ApiResponse(responseCode = "401", description = "INVALID_TOKEN",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "INVALID_TOKEN", value = DELETE_INVALID_TOKEN))),
+            @ApiResponse(responseCode = "404", description = "PET_NOT_FOUND. 미존재, 타인 소유, 이미 삭제된 개체를 동일하게 처리합니다.",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "PET_NOT_FOUND", value = DELETE_PET_NOT_FOUND)))
+    })
+    public ResponseEntity<Void> delete(
+            @PathVariable Long petId,
+            @AuthenticationPrincipal AuthUser authUser
+    ) {
+        requireAuthentication(authUser);
+        commandService.delete(authUser.userId(), petId);
+        return ResponseEntity.noContent().build();
     }
 
     private void requireAuthentication(AuthUser authUser) {

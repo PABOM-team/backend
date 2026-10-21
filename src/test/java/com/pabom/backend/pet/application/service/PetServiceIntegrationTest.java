@@ -145,6 +145,34 @@ class PetServiceIntegrationTest {
     }
 
     @Test
+    void softDeletesPetAndExcludesItFromQueriesCountsUpdatesAndIdempotentCreateReplay() {
+        UUID requestId = UUID.randomUUID();
+        CreatePetCommand create = command(requestId, List.of(), null);
+        PetResult deleted = commandService.create(owner.getId(), create);
+        PetResult remaining = commandService.create(owner.getId(), command(List.of(), null));
+
+        commandService.delete(owner.getId(), deleted.id());
+
+        assertThat(petRepository.findById(deleted.id()).orElseThrow().getDeletedAt()).isNotNull();
+        assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
+                .containsExactly(remaining.id());
+        assertThatThrownBy(() -> queryService.get(owner.getId(), deleted.id()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.update(owner.getId(), deleted.id(), emptyUpdate()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.delete(owner.getId(), deleted.id()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.create(owner.getId(), create))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThat(petRepository.countByUserIdAndStatus(owner.getId(),
+                com.pabom.backend.pet.domain.type.PetStatus.ACTIVE)).isEqualTo(1);
+    }
+
+    @Test
     void listsAndGetsOnlyOwnedPets() {
         PetResult olderOwned = commandService.create(owner.getId(), command(List.of(), null));
         PetResult newerOwned = commandService.create(owner.getId(), command(List.of(), null));

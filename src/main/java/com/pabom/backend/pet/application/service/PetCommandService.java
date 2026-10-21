@@ -11,6 +11,7 @@ import com.pabom.backend.pet.domain.repository.PetRepository;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
 import com.pabom.backend.species.domain.entity.Morph;
+import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,6 +27,7 @@ public class PetCommandService {
     private final PetRepository petRepository;
     private final PetValidator validator;
     private final Clock clock;
+    private final CareRecordJpaRepository careRecordRepository;
 
     @Transactional
     public PetResult create(Long userId, CreatePetCommand command) {
@@ -33,8 +35,11 @@ public class PetCommandService {
             throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
         }
         String requestId = command.clientRequestId().toString();
-        Pet existing = petRepository.findByUserIdAndClientRequestId(userId, requestId).orElse(null);
+        Pet existing = petRepository.findByUserIdAndClientRequestIdForUpdate(userId, requestId).orElse(null);
         if (existing != null) {
+            if (existing.getDeletedAt() != null) {
+                throw new BusinessException(PetErrorCode.PET_NOT_FOUND);
+            }
             return PetResult.from(existing);
         }
 
@@ -72,8 +77,17 @@ public class PetCommandService {
     }
 
     @Transactional
+    public void delete(Long userId, Long petId) {
+        Pet pet = petRepository.findActiveByIdAndUserIdForUpdate(petId, userId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+        Instant now = clock.instant();
+        pet.delete(now);
+        careRecordRepository.softDeleteActiveByPetId(petId, now);
+    }
+
+    @Transactional
     public PetResult update(Long userId, Long petId, UpdatePetCommand command) {
-        Pet pet = petRepository.findByIdAndUserId(petId, userId)
+        Pet pet = petRepository.findActiveByIdAndUserIdForUpdate(petId, userId)
                 .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
 
         List<Morph> finalMorphs = pet.getMorphs();

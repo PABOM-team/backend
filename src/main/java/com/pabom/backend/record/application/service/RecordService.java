@@ -57,6 +57,7 @@ public class RecordService {
 
     @Transactional
     public RecordMutationResponse create(Long userId, CreateRecordRequest request) {
+        Pet pet = ownedPetForUpdate(userId, request.petId());
         String hash = requestHash(request);
         Optional<CareRecord> replay = records.findByUserIdAndClientRequestId(userId, request.clientRequestId().toString());
         if (replay.isPresent()) {
@@ -65,7 +66,6 @@ public class RecordService {
                     : routines.findById(replay.get().getRoutineId()).orElse(null);
             return new RecordMutationResponse(toRecord(replay.get()), currentRoutine(routine));
         }
-        Pet pet = ownedPet(userId, request.petId());
         if (pet.getStatus() != PetStatus.ACTIVE) throw error(RecordErrorCode.PET_NOT_ACTIVE);
         CareItem item = item(request.itemCode());
         TimePrecision precision = request.timePrecision() == null ? TimePrecision.EXACT : request.timePrecision();
@@ -87,6 +87,7 @@ public class RecordService {
     @Transactional(readOnly = true)
     public RecordDetailResponse get(Long userId, Long recordId) {
         CareRecord record = ownedRecord(userId, recordId);
+        requireActiveParent(userId, record, false);
         Instant now = clock.instant();
         if (record.getDeletedAt() != null && record.getDeletedAt().plus(RESTORE_WINDOW).isBefore(now))
             throw error(RecordErrorCode.RECORD_NOT_FOUND);
@@ -99,6 +100,7 @@ public class RecordService {
     public RecordMutationResponse update(Long userId, Long recordId, UpdateRecordRequest request) {
         if (request.hasNotEditableFields()) throw error(RecordErrorCode.FIELD_NOT_EDITABLE);
         CareRecord record = ownedRecord(userId, recordId);
+        requireActiveParent(userId, record, true);
         if (record.getDeletedAt() != null) throw error(RecordErrorCode.RECORD_DELETED);
         if (record.getRevisionNo() != request.getRevisionNo()) throw error(RecordErrorCode.RECORD_CONFLICT);
         CareItem item = items.findById(record.getCareItemId()).orElseThrow(() -> error(RecordErrorCode.CARE_ITEM_INVALID));
@@ -132,6 +134,7 @@ public class RecordService {
     @Transactional
     public DeleteRecordResponse delete(Long userId, Long recordId) {
         CareRecord record = ownedRecord(userId, recordId);
+        requireActiveParent(userId, record, true);
         Routine routine = record.getRoutineId() == null ? null : routines.findById(record.getRoutineId()).orElse(null);
         if (record.getDeletedAt() != null) {
             return new DeleteRecordResponse(record.getId(), atKst(record.getDeletedAt()),
@@ -149,10 +152,11 @@ public class RecordService {
     @Transactional
     public RecordMutationResponse restore(Long userId, Long recordId) {
         CareRecord record = ownedRecord(userId, recordId);
+        requireActiveParent(userId, record, true);
         if (record.getDeletedAt() == null) throw error(RecordErrorCode.RECORD_NOT_DELETED);
         Instant now = clock.instant();
         if (record.getDeletedAt().plus(RESTORE_WINDOW).isBefore(now)) throw error(RecordErrorCode.RESTORE_WINDOW_EXPIRED);
-        Pet pet = ownedPet(userId, record.getPetId());
+        Pet pet = ownedPetForUpdate(userId, record.getPetId());
         if (pet.getStatus() != PetStatus.ACTIVE) throw error(RecordErrorCode.PET_NOT_ACTIVE);
         ObjectNode before = snapshot(record); record.restore(now); records.saveAndFlush(record); ObjectNode after = snapshot(record);
         revisions.save(CareRecordRevision.of(record.getId(), RevisionChangeType.RESTORE, "[\"deletedAt\"]",
@@ -170,6 +174,7 @@ public class RecordService {
         if (from != null && to != null && (from.isAfter(to) || ChronoUnit.DAYS.between(from, to) > 365))
             throw error(AuthErrorCode.VALIDATION_FAILED);
         if (petId != null) ownedPet(userId, petId);
+        List<Long> activePetIds = pets.findActiveIdsByUserId(userId);
         List<Long> itemIds = null;
         if (itemCodes != null && !itemCodes.isBlank()) {
             itemIds = Arrays.stream(itemCodes.split(",")).map(String::trim).filter(s -> !s.isEmpty())
@@ -184,6 +189,7 @@ public class RecordService {
         Specification<CareRecord> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("userId"), userId));
+            predicates.add(root.get("petId").in(activePetIds));
             if (petId != null) predicates.add(cb.equal(root.get("petId"), petId));
             if (filterItemIds != null) predicates.add(root.get("careItemId").in(filterItemIds));
             if (recordType != null) predicates.add(cb.equal(root.get("recordType"), recordType));
@@ -213,6 +219,16 @@ public class RecordService {
 
     private Pet ownedPet(Long userId, Long petId) {
         return pets.findOwnedById(petId, userId).orElseThrow(() -> error(PetErrorCode.PET_NOT_FOUND));
+    }
+    private Pet ownedPetForUpdate(Long userId, Long petId) {
+        return pets.findActiveOwnedByIdForUpdate(petId, userId)
+                .orElseThrow(() -> error(PetErrorCode.PET_NOT_FOUND));
+    }
+    private void requireActiveParent(Long userId, CareRecord record, boolean lock) {
+        Optional<Pet> parent = lock
+                ? pets.findActiveOwnedByIdForUpdate(record.getPetId(), userId)
+                : pets.findOwnedById(record.getPetId(), userId);
+        if (parent.isEmpty()) throw error(RecordErrorCode.RECORD_NOT_FOUND);
     }
     private CareRecord ownedRecord(Long userId, Long recordId) {
         return records.findByIdAndUserId(recordId, userId).orElseThrow(() -> error(RecordErrorCode.RECORD_NOT_FOUND));

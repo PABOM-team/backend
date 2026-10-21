@@ -41,6 +41,12 @@ public final class PetOpenApiExamples {
     public static final String PET_NOT_FOUND = """
             {"resultType":"FAIL","success":null,"error":{"code":"PET_NOT_FOUND","message":"개체를 찾을 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets/999"}}
             """;
+    public static final String DELETE_INVALID_TOKEN = """
+            {"resultType":"FAIL","success":null,"error":{"code":"INVALID_TOKEN","message":"유효하지 않거나 만료된 인증 토큰입니다.","details":null},"meta":{"timestamp":"2026-10-21T03:00:00","path":"/api/v1/pets/1"}}
+            """;
+    public static final String DELETE_PET_NOT_FOUND = """
+            {"resultType":"FAIL","success":null,"error":{"code":"PET_NOT_FOUND","message":"개체를 찾을 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-21T03:00:00","path":"/api/v1/pets/999"}}
+            """;
     public static final String LIFE_STAGE_INVALID = """
             {"resultType":"FAIL","success":null,"error":{"code":"LIFE_STAGE_INVALID","message":"유효하지 않은 성장 단계입니다.","details":null},"meta":{"timestamp":"2026-10-18T07:52:18.222","path":"/api/v1/pets"}}
             """;

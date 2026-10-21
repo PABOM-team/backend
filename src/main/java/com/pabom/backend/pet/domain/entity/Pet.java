@@ -96,6 +96,9 @@ public class Pet {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected Pet() {
     }
 
@@ -186,6 +189,13 @@ public class Pet {
         touch(now);
     }
 
+    public void delete(Instant now) {
+        if (deletedAt == null) {
+            deletedAt = now;
+            touch(now);
+        }
+    }
+
     private void touch(Instant now) {
         this.updatedAt = now;
     }
@@ -209,4 +219,5 @@ public class Pet {
     public PetStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getDeletedAt() { return deletedAt; }
 }
