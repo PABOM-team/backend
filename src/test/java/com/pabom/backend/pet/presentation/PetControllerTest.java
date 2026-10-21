@@ -4,10 +4,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 
 import com.pabom.backend.global.error.GlobalExceptionHandler;
 import com.pabom.backend.global.error.BusinessException;
@@ -112,6 +114,28 @@ class PetControllerTest {
         mockMvc.perform(get("/api/v1/pets"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("INVALID_TOKEN"));
+    }
+
+    @Test
+    void deletesOwnedPetWithEmpty204Response() throws Exception {
+        mockMvc.perform(delete("/api/v1/pets/10"))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        org.mockito.Mockito.verify(commandService).delete(7L, 10L);
+    }
+
+    @Test
+    void returnsPetNotFoundEnvelopeWhenDeleteTargetIsUnavailable() throws Exception {
+        org.mockito.Mockito.doThrow(new BusinessException(PetErrorCode.PET_NOT_FOUND))
+                .when(commandService).delete(7L, 999L);
+
+        mockMvc.perform(delete("/api/v1/pets/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.resultType").value("FAIL"))
+                .andExpect(jsonPath("$.success").doesNotExist())
+                .andExpect(jsonPath("$.error.code").value("PET_NOT_FOUND"))
+                .andExpect(jsonPath("$.meta.path").value("/api/v1/pets/999"));
     }
 
     @Test

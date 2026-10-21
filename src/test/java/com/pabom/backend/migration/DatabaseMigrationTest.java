@@ -23,6 +23,7 @@ class DatabaseMigrationTest {
     private static final String PET_VERSION = "20261018000100";
     private static final String ADOPTED_AT_VERSION = "20261018000200";
     private static final String RECORD_VERSION = "20261020000100";
+    private static final String PET_SOFT_DELETE_VERSION = "20261021000100";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -57,6 +58,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 RECORD_VERSION
         );
+        Boolean petSoftDeleteMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                PET_SOFT_DELETE_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -71,6 +77,7 @@ class DatabaseMigrationTest {
         assertThat(petMigrationSuccess).isTrue();
         assertThat(adoptedAtMigrationSuccess).isTrue();
         assertThat(recordMigrationSuccess).isTrue();
+        assertThat(petSoftDeleteMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
@@ -87,6 +94,28 @@ class DatabaseMigrationTest {
                 "care_records",
                 "care_record_revisions"
         );
+    }
+
+    @Test
+    void addsNullablePetDeletedAtColumnAndCleanupIndex() {
+        var column = jdbcTemplate.queryForMap(
+                """
+                SELECT data_type, is_nullable
+                  FROM information_schema.columns
+                 WHERE table_schema = 'public'
+                   AND table_name = 'pets'
+                   AND column_name = 'deleted_at'
+                """
+        );
+        List<String> indexes = jdbcTemplate.queryForList(
+                "SELECT index_name FROM information_schema.indexes "
+                        + "WHERE table_schema='public' AND table_name='pets'",
+                String.class
+        );
+
+        assertThat(column.get("DATA_TYPE").toString()).isEqualToIgnoringCase("timestamp");
+        assertThat(column.get("IS_NULLABLE").toString()).isEqualToIgnoringCase("yes");
+        assertThat(indexes).contains("idx_pets_deleted_at");
     }
 
     @Test

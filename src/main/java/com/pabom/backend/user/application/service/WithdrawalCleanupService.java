@@ -80,9 +80,9 @@ public class WithdrawalCleanupService {
             storageKeys.forEach(fileStorage::delete);
 
             transactions.executeWithoutResult(status -> {
-                // API-24 pet deletion is intentionally out of scope. Withdrawal removes every owned record,
-                // revision and routine before pets/files so soft-deleted records are included as well.
-                List<Long> petIds = petRepository.findAllByUserId(userId).stream()
+                // Withdrawal keeps its 24-hour policy: it removes active and soft-deleted pets immediately,
+                // independently of the pet cleanup scheduler's 30-day retention period.
+                List<Long> petIds = petRepository.findAllIncludingDeletedByUserId(userId).stream()
                         .map(com.pabom.backend.pet.domain.entity.Pet::getId).toList();
                 recordRevisionRepository.deleteAllByUserId(userId);
                 recordRepository.deleteAllByUserId(userId);

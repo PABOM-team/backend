@@ -145,6 +145,84 @@ class PetServiceIntegrationTest {
     }
 
     @Test
+    void keepsOriginalResultWhenSameClientRequestIdIsReusedWithDifferentPayload() {
+        UUID requestId = UUID.randomUUID();
+        CreatePetCommand original = command(requestId, List.of(), null);
+        CreatePetCommand changed = new CreatePetCommand(
+                requestId, leopard.getId(), "다른 이름", List.of(), null,
+                null, null, null, Certainty.UNKNOWN,
+                Sex.UNKNOWN, Certainty.UNKNOWN, null
+        );
+
+        PetResult first = commandService.create(owner.getId(), original);
+        PetResult replay = commandService.create(owner.getId(), changed);
+
+        assertThat(replay.id()).isEqualTo(first.id());
+        assertThat(replay.name()).isEqualTo(first.name());
+        assertThat(replay.speciesId()).isEqualTo(first.speciesId());
+        assertThat(petRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void persistsNewPetWithNullDeletedAtAndListsItImmediatelyForSameOwner() {
+        PetResult created = commandService.create(owner.getId(), command(List.of(), null));
+
+        assertThat(created.id()).isNotNull();
+        assertThat(petRepository.findById(created.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.getUserId()).isEqualTo(owner.getId());
+            assertThat(saved.getDeletedAt()).isNull();
+        });
+        assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
+                .containsExactly(created.id());
+        assertThat(queryService.getAll(other.getId())).isEmpty();
+    }
+
+    @Test
+    void rejectsDeletedPetsClientRequestIdAndAllowsRegistrationWithNewClientRequestId() {
+        UUID requestId = UUID.randomUUID();
+        CreatePetCommand create = command(requestId, List.of(), null);
+        PetResult deleted = commandService.create(owner.getId(), create);
+        PetResult remaining = commandService.create(owner.getId(), command(List.of(), null));
+
+        commandService.delete(owner.getId(), deleted.id());
+
+        assertThat(petRepository.findById(deleted.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.getDeletedAt()).isNotNull();
+            assertThat(saved.getClientRequestId()).isEqualTo(requestId.toString());
+        });
+        assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
+                .containsExactly(remaining.id());
+        assertThatThrownBy(() -> queryService.get(owner.getId(), deleted.id()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.update(owner.getId(), deleted.id(), emptyUpdate()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.delete(owner.getId(), deleted.id()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+        assertThatThrownBy(() -> commandService.create(owner.getId(), create))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+
+        UUID newRequestId = UUID.randomUUID();
+        PetResult replacement = commandService.create(
+                owner.getId(), command(newRequestId, List.of(), null));
+
+        assertThat(replacement.id()).isNotEqualTo(deleted.id());
+        assertThat(petRepository.findById(deleted.id())).hasValueSatisfying(saved ->
+                assertThat(saved.getClientRequestId()).isEqualTo(requestId.toString()));
+        assertThat(petRepository.findById(replacement.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.getClientRequestId()).isEqualTo(newRequestId.toString());
+            assertThat(saved.getDeletedAt()).isNull();
+        });
+        assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
+                .containsExactly(replacement.id(), remaining.id());
+        assertThat(petRepository.countByUserIdAndStatus(owner.getId(),
+                com.pabom.backend.pet.domain.type.PetStatus.ACTIVE)).isEqualTo(2);
+    }
+
+    @Test
     void listsAndGetsOnlyOwnedPets() {
         PetResult olderOwned = commandService.create(owner.getId(), command(List.of(), null));
         PetResult newerOwned = commandService.create(owner.getId(), command(List.of(), null));

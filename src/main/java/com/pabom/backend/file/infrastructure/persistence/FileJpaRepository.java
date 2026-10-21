@@ -13,4 +13,6 @@ public interface FileJpaRepository extends JpaRepository<File, Long> {
     List<File> findAllByOwnerId(Long ownerId);
 
     void deleteAllByOwnerId(Long ownerId);
+
+    void deleteAllByIdIn(Iterable<Long> ids);
 }

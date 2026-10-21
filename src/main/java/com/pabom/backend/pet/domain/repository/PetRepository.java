@@ -11,9 +11,15 @@ public interface PetRepository {
 
     Optional<Pet> findByUserIdAndClientRequestId(Long userId, String clientRequestId);
 
+    Optional<Pet> findByUserIdAndClientRequestIdForUpdate(Long userId, String clientRequestId);
+
     List<Pet> findAllByUserId(Long userId);
 
+    List<Pet> findAllIncludingDeletedByUserId(Long userId);
+
     Optional<Pet> findByIdAndUserId(Long id, Long userId);
+
+    Optional<Pet> findActiveByIdAndUserIdForUpdate(Long id, Long userId);
 
     long countByUserIdAndStatus(Long userId, PetStatus status);
 

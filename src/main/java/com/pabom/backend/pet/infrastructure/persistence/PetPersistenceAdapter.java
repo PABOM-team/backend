@@ -25,13 +25,28 @@ public class PetPersistenceAdapter implements PetRepository {
     }
 
     @Override
+    public Optional<Pet> findByUserIdAndClientRequestIdForUpdate(Long userId, String clientRequestId) {
+        return repository.findOwnedByClientRequestIdForUpdate(userId, clientRequestId);
+    }
+
+    @Override
     public List<Pet> findAllByUserId(Long userId) {
         return repository.findAllOwned(userId);
     }
 
     @Override
+    public List<Pet> findAllIncludingDeletedByUserId(Long userId) {
+        return repository.findAllOwnedIncludingDeleted(userId);
+    }
+
+    @Override
     public Optional<Pet> findByIdAndUserId(Long id, Long userId) {
         return repository.findOwnedById(id, userId);
+    }
+
+    @Override
+    public Optional<Pet> findActiveByIdAndUserIdForUpdate(Long id, Long userId) {
+        return repository.findActiveOwnedByIdForUpdate(id, userId);
     }
 
     @Override

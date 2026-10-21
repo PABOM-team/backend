@@ -14,6 +14,7 @@ import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.pet.domain.entity.Pet;
 import com.pabom.backend.pet.domain.type.*;
 import com.pabom.backend.pet.infrastructure.persistence.PetJpaRepository;
+import com.pabom.backend.pet.application.service.PetCommandService;
 import com.pabom.backend.record.domain.entity.*;
 import com.pabom.backend.record.domain.error.RecordErrorCode;
 import com.pabom.backend.record.domain.type.*;
@@ -42,6 +43,7 @@ class RecordServiceIntegrationTest {
     @Autowired UserJpaRepository users; @Autowired LoginEventJpaRepository events;
     @Autowired ObjectMapper mapper; @Autowired JdbcTemplate jdbc; @Autowired Clock clock;
     @Autowired EntityManager entityManager;
+    @Autowired PetCommandService petCommands;
     @MockitoBean FileStoragePort storage;
     private User owner; private User other; private Pet pet;
 
@@ -135,6 +137,28 @@ class RecordServiceIntegrationTest {
         assertError(() -> service.create(owner.getId(),request(UUID.randomUUID(),"WEIGHT",null,new BigDecimal("11"),null,null,TimePrecision.EXACT)),RecordErrorCode.VALUE_OUT_OF_RANGE);
         jdbc.update("update pets set status='ENDED' where id=?",pet.getId()); entityManager.clear();
         assertError(() -> service.create(owner.getId(),request(UUID.randomUUID(),"MEMO",null,null,null,"ok",TimePrecision.EXACT)),RecordErrorCode.PET_NOT_ACTIVE);
+    }
+
+    @Test void petDeletionSoftDeletesOnlyActiveRecordsAndBlocksEveryRecordAccessPath() {
+        var active=service.create(owner.getId(),request(UUID.randomUUID(),"FEEDING",FeedingOutcome.ATE_ALL,null,null,null,TimePrecision.EXACT));
+        var alreadyDeleted=service.create(owner.getId(),request(UUID.randomUUID(),"MEMO",null,null,null,"old",TimePrecision.EXACT));
+        service.delete(owner.getId(),alreadyDeleted.record().id());
+        Instant originalDeletedAt=records.findById(alreadyDeleted.record().id()).orElseThrow().getDeletedAt();
+
+        petCommands.delete(owner.getId(),pet.getId());
+        entityManager.clear();
+
+        Pet deletedPet=pets.findById(pet.getId()).orElseThrow();
+        assertThat(deletedPet.getDeletedAt()).isNotNull();
+        assertThat(records.findById(active.record().id()).orElseThrow().getDeletedAt()).isNotNull();
+        assertThat(records.findById(alreadyDeleted.record().id()).orElseThrow().getDeletedAt()).isEqualTo(originalDeletedAt);
+        assertThat(revisions.countByCareRecordIdAndChangeType(active.record().id(),RevisionChangeType.DELETE)).isZero();
+        assertThat(revisions.countByCareRecordIdAndChangeType(alreadyDeleted.record().id(),RevisionChangeType.DELETE)).isEqualTo(1);
+        assertThat(service.list(owner.getId(),null,null,null,null,null,true,null,20).items()).isEmpty();
+        assertError(() -> service.get(owner.getId(),active.record().id()),RecordErrorCode.RECORD_NOT_FOUND);
+        assertError(() -> service.restore(owner.getId(),alreadyDeleted.record().id()),RecordErrorCode.RECORD_NOT_FOUND);
+        assertError(() -> service.create(owner.getId(),request(UUID.randomUUID(),"MEMO",null,null,null,"new",TimePrecision.EXACT)),
+                com.pabom.backend.pet.domain.error.PetErrorCode.PET_NOT_FOUND);
     }
 
     private CreateRecordRequest request(UUID id,String code,FeedingOutcome outcome,BigDecimal value,com.fasterxml.jackson.databind.JsonNode detail,String memo,TimePrecision precision) {
