@@ -196,13 +196,6 @@ public class Pet {
         }
     }
 
-    public void retireClientRequestId(String retiredClientRequestId) {
-        if (deletedAt == null) {
-            throw new IllegalStateException("Only a deleted pet can retire its clientRequestId");
-        }
-        this.clientRequestId = retiredClientRequestId;
-    }
-
     private void touch(Instant now) {
         this.updatedAt = now;
     }

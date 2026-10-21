@@ -178,7 +178,7 @@ class PetServiceIntegrationTest {
     }
 
     @Test
-    void reusingDeletedPetsClientRequestIdCreatesDistinctActivePet() {
+    void rejectsDeletedPetsClientRequestIdAndAllowsRegistrationWithNewClientRequestId() {
         UUID requestId = UUID.randomUUID();
         CreatePetCommand create = command(requestId, List.of(), null);
         PetResult deleted = commandService.create(owner.getId(), create);
@@ -186,7 +186,10 @@ class PetServiceIntegrationTest {
 
         commandService.delete(owner.getId(), deleted.id());
 
-        assertThat(petRepository.findById(deleted.id()).orElseThrow().getDeletedAt()).isNotNull();
+        assertThat(petRepository.findById(deleted.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.getDeletedAt()).isNotNull();
+            assertThat(saved.getClientRequestId()).isEqualTo(requestId.toString());
+        });
         assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
                 .containsExactly(remaining.id());
         assertThatThrownBy(() -> queryService.get(owner.getId(), deleted.id()))
@@ -198,13 +201,21 @@ class PetServiceIntegrationTest {
         assertThatThrownBy(() -> commandService.delete(owner.getId(), deleted.id()))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
-        PetResult replacement = commandService.create(owner.getId(), create);
-        PetResult replay = commandService.create(owner.getId(), create);
+        assertThatThrownBy(() -> commandService.create(owner.getId(), create))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(PetErrorCode.PET_NOT_FOUND));
+
+        UUID newRequestId = UUID.randomUUID();
+        PetResult replacement = commandService.create(
+                owner.getId(), command(newRequestId, List.of(), null));
 
         assertThat(replacement.id()).isNotEqualTo(deleted.id());
-        assertThat(replay.id()).isEqualTo(replacement.id());
-        assertThat(petRepository.findById(deleted.id()).orElseThrow().getDeletedAt()).isNotNull();
-        assertThat(petRepository.findById(replacement.id()).orElseThrow().getDeletedAt()).isNull();
+        assertThat(petRepository.findById(deleted.id())).hasValueSatisfying(saved ->
+                assertThat(saved.getClientRequestId()).isEqualTo(requestId.toString()));
+        assertThat(petRepository.findById(replacement.id())).hasValueSatisfying(saved -> {
+            assertThat(saved.getClientRequestId()).isEqualTo(newRequestId.toString());
+            assertThat(saved.getDeletedAt()).isNull();
+        });
         assertThat(queryService.getAll(owner.getId())).extracting(PetListResult::id)
                 .containsExactly(replacement.id(), remaining.id());
         assertThat(petRepository.countByUserIdAndStatus(owner.getId(),
