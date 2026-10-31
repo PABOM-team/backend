@@ -19,7 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "Admin Care Guideline", description = "관리자용 관리 가이드라인 API")
 public interface CareGuidelineAdminControllerDocs {
     @Operation(
-            summary = "API-92 관리 가이드라인 CSV Import",
+            summary = " 관리 가이드라인 CSV Import",
             description = "UTF-8 CSV 5개를 함께 검증합니다. DRY_RUN은 저장하지 않고, COMMIT은 전체 검증 성공 시 한 트랜잭션으로 저장합니다. publish=true이면 effectiveFrom이 필수입니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
     @ApiResponses({
