@@ -5,5 +5,6 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CareItemJpaRepository extends JpaRepository<CareItem, Long> {
+    Optional<CareItem> findByCode(String code);
     Optional<CareItem> findByCodeAndActiveTrue(String code);
 }

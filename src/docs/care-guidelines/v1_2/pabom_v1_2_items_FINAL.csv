@@ -1,0 +1,11 @@
+﻿item_code,item_name,record_type,unit,active,suggested_existing_input_type,outcome_allowed,requires_input_model_extension
+FEED,급여,FEED,,true,DETAIL,true,false
+MULTIVITAMIN,종합 비타민,OX,,true,DETAIL,false,true
+HUMID_HIDE,습식 은신처 적시기,OX,,true,DETAIL,false,true
+WATER,물 갈기,OX,,true,DETAIL,false,true
+WEIGHT,체중,WEIGHT,g,true,NUMBER,false,false
+CLEAN,청소,OX,,true,DETAIL,false,true
+SHED_CHECK,탈피 확인,OX,,true,DETAIL,false,true
+UVB_LAMP,UVB 램프 교체,OX,,true,DETAIL,false,true
+FEED_INSECT,곤충 급여,FEED,,true,DETAIL,true,false
+MIST,분무,OX,,true,DETAIL,false,true

@@ -47,3 +47,8 @@ out/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# PABOM 내부 기획 및 명세 문서
+/docs/ia/
+/docs/care-guidelines/v1_2/*.pdf
+/docs/care-guidelines/v1_2/*.docx
