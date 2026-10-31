@@ -18,6 +18,10 @@ import com.pabom.backend.pet.application.result.PetResult;
 import com.pabom.backend.pet.application.result.PetListResult;
 import com.pabom.backend.pet.application.service.PetCommandService;
 import com.pabom.backend.pet.application.service.PetQueryService;
+import com.pabom.backend.careguideline.application.service.PetRoutineQueryService;
+import com.pabom.backend.careguideline.application.result.PetRoutineResult;
+import com.pabom.backend.record.domain.type.CycleSource;
+import java.time.OffsetDateTime;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
 import com.pabom.backend.pet.domain.error.PetErrorCode;
@@ -39,13 +43,15 @@ class PetControllerTest {
 
     private PetCommandService commandService;
     private PetQueryService queryService;
+    private PetRoutineQueryService routineQueryService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         commandService = org.mockito.Mockito.mock(PetCommandService.class);
         queryService = org.mockito.Mockito.mock(PetQueryService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new PetController(commandService, queryService))
+        routineQueryService = org.mockito.Mockito.mock(PetRoutineQueryService.class);
+        mockMvc = MockMvcBuilders.standaloneSetup(new PetController(commandService, queryService, routineQueryService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -82,6 +88,19 @@ class PetControllerTest {
                 .andExpect(jsonPath("$.success.data.id").value(10))
                 .andExpect(jsonPath("$.success.data.name").value("콩이"))
                 .andExpect(jsonPath("$.success.data.adoptedAt").value("2026-04-10"));
+    }
+
+    @Test
+    void returnsOwnedPetRoutines() throws Exception {
+        given(routineQueryService.get(7L, 10L)).willReturn(List.of(new PetRoutineResult(
+                1L, 10L, "FEED", "급여", true, 3, CycleSource.GUIDELINE,
+                3, 2, 4, false, OffsetDateTime.parse("2026-11-04T12:00:00+09:00"),
+                "1.2", "FEED", "설명")));
+
+        mockMvc.perform(get("/api/v1/pets/10/routines"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success.data[0].careItemCode").value("FEED"))
+                .andExpect(jsonPath("$.success.data[0].isOutOfRange").value(false));
     }
 
     @Test

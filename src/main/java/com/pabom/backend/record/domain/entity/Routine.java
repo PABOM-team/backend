@@ -1,5 +1,6 @@
 package com.pabom.backend.record.domain.entity;
 
+import com.pabom.backend.record.domain.type.CycleSource;
 import jakarta.persistence.*;
 import java.time.Instant;
 
@@ -12,12 +13,28 @@ public class Routine {
     @Column(nullable = false) private boolean active;
     @Column(name = "interval_days") private Integer intervalDays;
     @Column(name = "next_due_at") private Instant nextDueAt;
+    @Column(name = "guideline_version_id") private Long guidelineVersionId;
+    @Enumerated(EnumType.STRING) @Column(name = "cycle_source", length = 20)
+    private CycleSource cycleSource;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
     protected Routine() {}
     public static Routine active(Long petId, Long careItemId, Integer intervalDays, Instant now) {
         Routine routine = new Routine(); routine.petId = petId; routine.careItemId = careItemId;
         routine.active = true; routine.intervalDays = intervalDays; routine.updatedAt = now; return routine;
+    }
+    public static Routine guideline(Long petId, Long careItemId, int intervalDays, boolean active,
+            Long guidelineVersionId, Instant nextDueAt, Instant now) {
+        Routine routine = new Routine();
+        routine.petId = petId;
+        routine.careItemId = careItemId;
+        routine.intervalDays = intervalDays;
+        routine.active = active;
+        routine.guidelineVersionId = guidelineVersionId;
+        routine.cycleSource = CycleSource.GUIDELINE;
+        routine.nextDueAt = nextDueAt;
+        routine.updatedAt = now;
+        return routine;
     }
     public void updateNextDueAt(Instant nextDueAt, Instant now) { this.nextDueAt = nextDueAt; this.updatedAt = now; }
     public Long getId() { return id; }
@@ -26,4 +43,6 @@ public class Routine {
     public boolean isActive() { return active; }
     public Integer getIntervalDays() { return intervalDays; }
     public Instant getNextDueAt() { return nextDueAt; }
+    public Long getGuidelineVersionId() { return guidelineVersionId; }
+    public CycleSource getCycleSource() { return cycleSource; }
 }
