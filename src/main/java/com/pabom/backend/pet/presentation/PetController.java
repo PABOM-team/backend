@@ -107,7 +107,8 @@ public class PetController {
     @PostMapping
     @Operation(
             summary = "개체 등록",
-            description = "인증 사용자를 소유자로 등록합니다. adoptedAt과 photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다.",
+            description = "인증 사용자를 소유자로 등록합니다. adoptedAt과 photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다. "
+                    + "clientRequestId는 멱등성 키이므로 Swagger 예시를 반복 실행할 때마다 새로운 UUID를 사용해야 합니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,

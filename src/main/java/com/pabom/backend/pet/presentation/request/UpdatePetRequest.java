@@ -35,8 +35,9 @@ public class UpdatePetRequest {
     @PastOrPresent
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate adoptedAt;
-    @Schema(description = "성장 단계 ID. 생략하면 유지, null이면 해제. 최종 정확성이 CONFIRMED/ESTIMATED이면 필수",
-            example = "1", nullable = true)
+    @Schema(description = "성장 단계 ID. 유효한 값: 2(JUVENILE), 3(ADULT), 4(UNKNOWN). "
+            + "생략하면 유지, null이면 해제. 최종 정확성이 CONFIRMED/ESTIMATED이면 필수",
+            example = "2", allowableValues = {"2", "3", "4"}, nullable = true)
     private Long lifeStageId;
     @Schema(description = "성장 단계 정확성. 생략하면 유지. UNKNOWN이면 최종 lifeStageId는 null이어야 함",
             example = "CONFIRMED")
@@ -73,7 +74,9 @@ public class UpdatePetRequest {
     @Schema(description = "데려온 날. 명시적 null이면 삭제", nullable = true)
     public void setAdoptedAt(LocalDate adoptedAt) { this.adoptedAt = adoptedAt; this.adoptedAtPresent = true; }
     @JsonSetter("lifeStageId")
-    @Schema(description = "성장 단계 ID. 명시적 null이면 해제하며 최종 정확성과 함께 검증", nullable = true)
+    @Schema(description = "성장 단계 ID. 유효한 값: 2(JUVENILE), 3(ADULT), 4(UNKNOWN). "
+            + "명시적 null이면 해제하며 최종 정확성과 함께 검증",
+            allowableValues = {"2", "3", "4"}, nullable = true)
     public void setLifeStageId(Long lifeStageId) { this.lifeStageId = lifeStageId; this.lifeStageIdPresent = true; }
     @JsonSetter("stageCertainty")
     public void setStageCertainty(Certainty value) { this.stageCertainty = value; this.stageCertaintyPresent = true; }

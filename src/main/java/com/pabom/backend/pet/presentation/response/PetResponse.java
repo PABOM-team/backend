@@ -19,7 +19,8 @@ public record PetResponse(
         LocalDate hatchedAt,
         @Schema(description = "데려온 날", example = "2026-04-10", type = "string", format = "date", nullable = true)
         @JsonFormat(pattern = "yyyy-MM-dd") LocalDate adoptedAt,
-        @Schema(description = "성장 단계 ID", example = "1", nullable = true) Long lifeStageId,
+        @Schema(description = "성장 단계 ID. 2(JUVENILE), 3(ADULT), 4(UNKNOWN)",
+                example = "2", allowableValues = {"2", "3", "4"}, nullable = true) Long lifeStageId,
         @Schema(description = "성장 단계 정확성", example = "CONFIRMED") Certainty stageCertainty,
         @Schema(description = "성별", example = "FEMALE") Sex sex,
         @Schema(description = "성별 정확성", example = "ESTIMATED") Certainty sexCertainty,

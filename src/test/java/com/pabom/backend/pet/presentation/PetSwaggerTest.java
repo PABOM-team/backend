@@ -50,6 +50,12 @@ class PetSwaggerTest {
                 .andExpect(jsonPath("$.paths['/api/v1/pets'].post.security[0].Authorization").isArray())
                 .andExpect(jsonPath("$.paths['/api/v1/pets'].post.requestBody.content['application/json'].examples['개체 등록'].value.clientRequestId")
                         .value("550e8400-e29b-41d4-a716-446655440000"))
+                .andExpect(jsonPath("$.paths['/api/v1/pets'].post.requestBody.content['application/json'].examples['개체 등록'].value.lifeStageId")
+                        .value(2))
+                .andExpect(jsonPath("$.paths['/api/v1/pets'].post.responses['201'].content['application/json'].examples['등록 성공'].value.success.data.lifeStageId")
+                        .value(2))
+                .andExpect(jsonPath("$.paths['/api/v1/pets'].post.description",
+                        containsString("반복 실행할 때마다 새로운 UUID")))
                 .andExpect(jsonPath("$.paths['/api/v1/pets/{petId}'].patch.requestBody.content['application/json'].examples['개체 수정'].value.hatchedAt")
                         .doesNotExist())
                 .andExpect(jsonPath("$.paths['/api/v1/pets/{petId}'].patch.requestBody.content['application/json'].examples['개체 수정'].value.adoptedAt")
@@ -102,6 +108,12 @@ class PetSwaggerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.clientRequestId.type").value("string"))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.clientRequestId.format").value("uuid"))
+                .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.clientRequestId.description",
+                        containsString("멱등성 키")))
+                .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.lifeStageId.description",
+                        containsString("2(JUVENILE), 3(ADULT), 4(UNKNOWN)")))
+                .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.lifeStageId.enum",
+                        containsInAnyOrder("2", "3", "4")))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.morphIds.type", hasItem("array")))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.hatchedAt.format").value("date"))
                 .andExpect(jsonPath("$.components.schemas.CreatePetRequest.properties.adoptedAt.format").value("date"))

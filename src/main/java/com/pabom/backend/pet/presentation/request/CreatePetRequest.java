@@ -14,7 +14,8 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreatePetRequest(
-        @Schema(description = "중복 등록 방지용 요청 UUID", example = "550e8400-e29b-41d4-a716-446655440000",
+        @Schema(description = "중복 등록 방지용 멱등성 키. Swagger 예시를 반복 실행할 때마다 새로운 UUID를 사용해야 함",
+                example = "550e8400-e29b-41d4-a716-446655440000",
                 requiredMode = Schema.RequiredMode.REQUIRED)
         @NotNull UUID clientRequestId,
         @Schema(description = "종 ID", example = "1", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -31,8 +32,9 @@ public record CreatePetRequest(
         @Schema(description = "데려온 날. 생략 또는 null 허용", example = "2026-04-10",
                 type = "string", format = "date", nullable = true)
         @PastOrPresent @JsonFormat(pattern = "yyyy-MM-dd") LocalDate adoptedAt,
-        @Schema(description = "성장 단계 ID. stageCertainty가 CONFIRMED 또는 ESTIMATED이면 필수이며, UNKNOWN이면 null이어야 함",
-                example = "1", nullable = true)
+        @Schema(description = "성장 단계 ID. 유효한 값: 2(JUVENILE), 3(ADULT), 4(UNKNOWN). "
+                + "stageCertainty가 CONFIRMED 또는 ESTIMATED이면 필수이며, UNKNOWN이면 null이어야 함",
+                example = "2", allowableValues = {"2", "3", "4"}, nullable = true)
         Long lifeStageId,
         @Schema(description = "성장 단계 정확성. 생략 또는 null이면 UNKNOWN. UNKNOWN은 lifeStageId null만 허용",
                 example = "CONFIRMED", nullable = true)
