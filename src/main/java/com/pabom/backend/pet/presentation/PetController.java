@@ -35,9 +35,12 @@ import com.pabom.backend.pet.presentation.request.CreatePetRequest;
 import com.pabom.backend.pet.presentation.request.UpdatePetRequest;
 import com.pabom.backend.pet.presentation.response.PetResponse;
 import com.pabom.backend.pet.presentation.response.PetListResponse;
+import com.pabom.backend.careguideline.application.service.PetRoutineQueryService;
+import com.pabom.backend.careguideline.application.result.PetRoutineResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -67,11 +70,45 @@ public class PetController {
 
     private final PetCommandService commandService;
     private final PetQueryService queryService;
+    private final PetRoutineQueryService routineQueryService;
+
+    @GetMapping("/{petId}/routines")
+    @Operation(summary = "개체별 관리 루틴 조회",
+            description = "로그인 사용자의 활성 개체 루틴을 조회합니다. UNKNOWN 개체는 JUVENILE 가이드라인 정보를 사용하며 레거시 코드는 신규 가이드라인 코드로 정규화합니다.",
+            security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "루틴 조회 성공",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.PetRoutineListEnvelope.class),
+                            examples = @ExampleObject(name = "조회 성공", value = """
+                                    {"resultType":"SUCCESS","success":{"data":[{"routineId":10,"petId":12,"careItemCode":"FEED","careItemName":"급여","active":true,"intervalDays":3,"cycleSource":"GUIDELINE","defaultCycleDays":3,"minDays":2,"maxDays":4,"isOutOfRange":false,"nextDueAt":null,"guidelineVersion":"1.2","recordType":"FEED","description":"먹이 관리 설명"}]},"error":null,"meta":{"timestamp":"2026-11-01T00:00:00","path":"/api/v1/pets/12/routines"}}
+                                    """))),
+            @ApiResponse(responseCode = "401", description = "INVALID_TOKEN",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "INVALID_TOKEN", value = INVALID_TOKEN))),
+            @ApiResponse(responseCode = "404", description = "PET_NOT_FOUND. 다른 사용자의 개체와 삭제된 개체도 동일하게 처리합니다.",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "PET_NOT_FOUND", value = PET_NOT_FOUND))),
+            @ApiResponse(responseCode = "409", description = "GUIDELINE_VERSION_CONFLICT",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "GUIDELINE_VERSION_CONFLICT", value = "{\"resultType\":\"FAIL\",\"success\":null,\"error\":{\"code\":\"GUIDELINE_VERSION_CONFLICT\",\"message\":\"동일 적용일의 게시 가이드라인이 여러 개입니다.\",\"details\":null},\"meta\":{\"timestamp\":\"2026-11-01T00:00:00\",\"path\":\"/api/v1/pets/12/routines\"}}")))
+    })
+    public ResponseEntity<ApiResponseBody<List<PetRoutineResult>>> getRoutines(
+            @Parameter(description = "조회할 개체 ID", example = "12", required = true)
+            @PathVariable Long petId,
+            @AuthenticationPrincipal AuthUser authUser,
+            HttpServletRequest request
+    ) {
+        requireAuthentication(authUser);
+        return ResponseEntity.ok(ApiResponseBody.success(
+                routineQueryService.get(authUser.userId(), petId), request));
+    }
 
     @PostMapping
     @Operation(
             summary = "개체 등록",
-            description = "인증 사용자를 소유자로 등록합니다. adoptedAt과 photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다.",
+            description = "인증 사용자를 소유자로 등록합니다. adoptedAt과 photoFileId를 포함한 선택 필드는 null 또는 생략할 수 있습니다. "
+                    + "clientRequestId는 멱등성 키이므로 Swagger 예시를 반복 실행할 때마다 새로운 UUID를 사용해야 합니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,

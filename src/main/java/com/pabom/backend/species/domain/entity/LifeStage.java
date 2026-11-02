@@ -24,6 +24,12 @@ public class LifeStage {
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
+    @Column(name = "has_own_guideline_rules", nullable = false)
+    private boolean hasOwnGuidelineRules;
+
+    @Column(name = "guideline_fallback_stage_id")
+    private Long guidelineFallbackStageId;
+
     protected LifeStage() {
     }
 
@@ -37,5 +43,29 @@ public class LifeStage {
 
     public String getName() {
         return name;
+    }
+
+    public int getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public boolean hasOwnGuidelineRules() {
+        return hasOwnGuidelineRules;
+    }
+
+    public Long getGuidelineFallbackStageId() {
+        return guidelineFallbackStageId;
+    }
+
+    public void updateGuidelineMetadata(
+            String name,
+            int displayOrder,
+            boolean hasOwnGuidelineRules,
+            Long guidelineFallbackStageId
+    ) {
+        this.name = name;
+        this.displayOrder = displayOrder;
+        this.hasOwnGuidelineRules = hasOwnGuidelineRules;
+        this.guidelineFallbackStageId = guidelineFallbackStageId;
     }
 }

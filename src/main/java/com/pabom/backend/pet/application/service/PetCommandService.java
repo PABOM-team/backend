@@ -12,6 +12,7 @@ import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
 import com.pabom.backend.species.domain.entity.Morph;
 import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaRepository;
+import com.pabom.backend.careguideline.application.service.InitialRoutineCreationService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,6 +29,7 @@ public class PetCommandService {
     private final PetValidator validator;
     private final Clock clock;
     private final CareRecordJpaRepository careRecordRepository;
+    private final InitialRoutineCreationService initialRoutineCreationService;
 
     @Transactional
     public PetResult create(Long userId, CreatePetCommand command) {
@@ -73,7 +75,9 @@ public class PetCommandService {
                 command.photoFileId(),
                 now
         );
-        return PetResult.from(petRepository.save(pet));
+        Pet saved = petRepository.save(pet);
+        initialRoutineCreationService.createIfApplicable(saved, now);
+        return PetResult.from(saved);
     }
 
     @Transactional

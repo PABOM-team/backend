@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
                 request.getMethod(),
                 request.getRequestURI()
         );
-        ErrorBody error = new ErrorBody(errorCode.getCode(), exception.getMessage(), null);
+        ErrorBody error = new ErrorBody(errorCode.getCode(), exception.getMessage(), exception.details());
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ApiResponseBody.fail(error, request));
     }

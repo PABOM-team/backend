@@ -1,0 +1,6 @@
+﻿species_code,sex,ref_weight_g,min_age_months,hatch_adult_age_months,guideline_version
+LEOPARD,ALL,45,9,18,1.2
+CRESTED,ALL,35,10,18,1.2
+BALL_PYTHON,MALE,600,11,18,1.2
+BALL_PYTHON,FEMALE,800,20,36,1.2
+BALL_PYTHON,UNKNOWN,600,11,36,1.2

@@ -7,6 +7,13 @@ import com.pabom.backend.species.presentation.response.MorphResponse;
 import com.pabom.backend.species.presentation.response.SpeciesResponse;
 import com.pabom.backend.user.presentation.response.UserProfileResponse;
 import com.pabom.backend.record.presentation.response.*;
+import com.pabom.backend.careguideline.presentation.response.CareGuidelineImportResponse;
+import com.pabom.backend.careguideline.application.result.SpeciesCareStandardsResult;
+import com.pabom.backend.careguideline.application.result.PetRoutineResult;
+import com.pabom.backend.careguideline.application.result.TodayResult;
+import com.pabom.backend.careguideline.application.result.RoutineMutationResult;
+import com.pabom.backend.careguideline.application.result.RoutineActionResult;
+import com.pabom.backend.careguideline.application.result.RoutinePostponeResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -96,6 +103,41 @@ public final class OpenApiSchemas {
     public record DeleteRecordEnvelope(ResultType resultType, DeleteRecordSuccess success,
             @Schema(nullable = true) ErrorData error, MetaData meta) {}
     public record DeleteRecordSuccess(DeleteRecordResponse data) {}
+
+    @Schema(name = "CareGuidelineImportApiResponse")
+    public record CareGuidelineImportEnvelope(ResultType resultType, CareGuidelineImportSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record CareGuidelineImportSuccess(CareGuidelineImportResponse data) {}
+
+    @Schema(name = "SpeciesCareStandardsApiResponse")
+    public record SpeciesCareStandardsEnvelope(ResultType resultType, SpeciesCareStandardsSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record SpeciesCareStandardsSuccess(SpeciesCareStandardsResult data) {}
+
+    @Schema(name = "PetRoutineListApiResponse")
+    public record PetRoutineListEnvelope(ResultType resultType, PetRoutineListSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record PetRoutineListSuccess(List<PetRoutineResult> data) {}
+
+    @Schema(name = "TodayApiResponse")
+    public record TodayEnvelope(ResultType resultType, TodaySuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record TodaySuccess(TodayResult data) {}
+
+    @Schema(name = "RoutineMutationApiResponse")
+    public record RoutineMutationEnvelope(ResultType resultType, RoutineMutationSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RoutineMutationSuccess(RoutineMutationResult data) {}
+
+    @Schema(name = "RoutineActionApiResponse")
+    public record RoutineActionEnvelope(ResultType resultType, RoutineActionSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RoutineActionSuccess(RoutineActionResult data) {}
+
+    @Schema(name = "RoutinePostponeApiResponse")
+    public record RoutinePostponeEnvelope(ResultType resultType, RoutinePostponeSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RoutinePostponeSuccess(RoutinePostponeResult data) {}
 
     @Schema(name = "ErrorApiResponse")
     public record ErrorEnvelope(

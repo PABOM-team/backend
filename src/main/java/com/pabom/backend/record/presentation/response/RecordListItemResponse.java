@@ -10,5 +10,6 @@ public record RecordListItemResponse(Long id, Long petId, String petName, String
         OffsetDateTime createdAt, @Schema(nullable = true) FeedingOutcome outcome,
         boolean needsResult, @Schema(nullable = true) BigDecimal valueNum,
         @Schema(nullable = true) String unit, String detailSummary,
-        @Schema(nullable = true) String memoPreview, boolean hasPhoto, boolean isEdited,
+        @Schema(nullable = true) String memoPreview, @Schema(nullable = true) SkipReasonCode reasonCode,
+        boolean hasPhoto, boolean isEdited,
         RecordSource source, @Schema(nullable = true) OffsetDateTime deletedAt) {}

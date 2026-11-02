@@ -24,6 +24,7 @@ class DatabaseMigrationTest {
     private static final String ADOPTED_AT_VERSION = "20261018000200";
     private static final String RECORD_VERSION = "20261020000100";
     private static final String PET_SOFT_DELETE_VERSION = "20261021000100";
+    private static final String CARE_GUIDELINE_VERSION = "20261022000100";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -63,6 +64,11 @@ class DatabaseMigrationTest {
                 Boolean.class,
                 PET_SOFT_DELETE_VERSION
         );
+        Boolean careGuidelineMigrationSuccess = jdbcTemplate.queryForObject(
+                "SELECT success FROM flyway_schema_history WHERE version = ?",
+                Boolean.class,
+                CARE_GUIDELINE_VERSION
+        );
         List<String> tables = jdbcTemplate.queryForList(
                 """
                 SELECT table_name
@@ -78,6 +84,7 @@ class DatabaseMigrationTest {
         assertThat(adoptedAtMigrationSuccess).isTrue();
         assertThat(recordMigrationSuccess).isTrue();
         assertThat(petSoftDeleteMigrationSuccess).isTrue();
+        assertThat(careGuidelineMigrationSuccess).isTrue();
         assertThat(tables).contains(
                 "users",
                 "refresh_tokens",
@@ -93,6 +100,12 @@ class DatabaseMigrationTest {
                 "routines",
                 "care_records",
                 "care_record_revisions"
+                ,"care_guideline_versions"
+                ,"care_standards"
+                ,"care_stage_thresholds"
+                ,"care_item_descriptions"
+                ,"care_item_code_mappings"
+                ,"routine_postponement_events"
         );
     }
 
@@ -181,7 +194,11 @@ class DatabaseMigrationTest {
                 "pk_care_records",
                 "uk_care_records_user_client_request",
                 "pk_care_record_revisions",
-                "fk_care_record_revisions_record"
+                "fk_care_record_revisions_record",
+                "uk_care_records_routine_action_date",
+                "fk_care_records_guideline_version",
+                "pk_routine_postponement_events",
+                "fk_routine_postponement_events_routine"
         );
         assertThat(indexes).contains(
                 "idx_refresh_tokens_family_id",
@@ -193,7 +210,8 @@ class DatabaseMigrationTest {
                 "idx_pet_morphs_morph_id"
                 ,"idx_routines_pet_active",
                 "idx_care_records_user_occurred",
-                "idx_care_record_revisions_record"
+                "idx_care_record_revisions_record",
+                "idx_routine_postponement_events_routine"
         );
     }
 
@@ -202,6 +220,14 @@ class DatabaseMigrationTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM species", Integer.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM morphs", Integer.class)).isEqualTo(17);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM life_stages", Integer.class)).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForList(
+                "select code from life_stages order by display_order", String.class))
+                .containsExactly("JUVENILE", "ADULT", "UNKNOWN");
+        assertThat(jdbcTemplate.queryForObject(
+                "select juvenile.code from life_stages unknown_stage "
+                        + "join life_stages juvenile on juvenile.id=unknown_stage.guideline_fallback_stage_id "
+                        + "where unknown_stage.code='UNKNOWN'", String.class))
+                .isEqualTo("JUVENILE");
 
         flyway.migrate();
 
@@ -224,5 +250,19 @@ class DatabaseMigrationTest {
         assertThat(weight.get("UNIT")).isEqualTo("g");
         assertThat(weight.get("MIN_VALUE")).isNull();
         assertThat(weight.get("MAX_VALUE")).isNull();
+    }
+
+    @Test
+    void createsReusableLegacyCareItemCodeMappingsWithoutImportingCsvData() {
+        assertThat(jdbcTemplate.queryForList(
+                "select legacy.code || '->' || mapping.guideline_item_code "
+                        + "from care_item_code_mappings mapping "
+                        + "join care_items legacy on legacy.id=mapping.legacy_care_item_id order by mapping.id",
+                String.class))
+                .containsExactly("FEEDING->FEED", "SHED->SHED_CHECK");
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from care_guideline_versions", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "select count(*) from care_standards", Integer.class)).isZero();
     }
 }

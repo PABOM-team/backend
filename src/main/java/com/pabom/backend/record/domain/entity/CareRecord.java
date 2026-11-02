@@ -4,6 +4,7 @@ import com.pabom.backend.record.domain.type.*;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "care_records", uniqueConstraints = @UniqueConstraint(
@@ -14,6 +15,10 @@ public class CareRecord {
     @Column(name = "pet_id", nullable = false) private Long petId;
     @Column(name = "care_item_id", nullable = false) private Long careItemId;
     @Column(name = "routine_id") private Long routineId;
+    @Column(name = "action_date") private LocalDate actionDate;
+    @Column(name = "guideline_version_id") private Long guidelineVersionId;
+    @Enumerated(EnumType.STRING) @Column(name = "skip_reason_code", length = 30)
+    private SkipReasonCode skipReasonCode;
     @Column(name = "client_request_id", nullable = false, length = 36) private String clientRequestId;
     @Column(name = "request_hash", nullable = false, length = 64) private String requestHash;
     @Enumerated(EnumType.STRING) @Column(name = "record_type", nullable = false, length = 20) private RecordType recordType;
@@ -48,11 +53,27 @@ public class CareRecord {
         return record;
     }
 
+    public static CareRecord routineAction(Long userId, Long petId, Long itemId, Long routineId,
+            String clientRequestId, String requestHash, RecordType recordType, Instant occurredAt,
+            LocalDate actionDate, TimePrecision precision, FeedingOutcome outcome,
+            BigDecimal valueNum, String detailJson, String memo, SkipReasonCode reasonCode,
+            Long guidelineVersionId, String standardVersionLabel, Instant now) {
+        CareRecord record = manual(userId, petId, itemId, routineId, clientRequestId, requestHash,
+                occurredAt, precision, outcome, valueNum, detailJson, memo, null, now);
+        record.recordType = recordType;
+        record.actionDate = actionDate;
+        record.skipReasonCode = reasonCode;
+        record.guidelineVersionId = guidelineVersionId;
+        record.standardVersionLabel = standardVersionLabel;
+        return record;
+    }
+
     public void edit(Instant occurredAt, TimePrecision precision, FeedingOutcome outcome,
             BigDecimal valueNum, String detailJson, String memo, Long photoFileId, Instant now) {
         this.occurredAt = occurredAt; this.timePrecision = precision; this.outcome = outcome;
         this.valueNum = valueNum; this.detailJson = detailJson; this.memo = memo;
         this.photoFileId = photoFileId; this.revisionNo++; this.updatedAt = now;
+        if (this.actionDate != null) this.actionDate = occurredAt.atZone(java.time.ZoneId.of("Asia/Seoul")).toLocalDate();
     }
     public void delete(Instant now) { if (deletedAt == null) { deletedAt = now; updatedAt = now; } }
     public void restore(Instant now) { deletedAt = null; revisionNo++; updatedAt = now; }
@@ -60,6 +81,9 @@ public class CareRecord {
     public Long getId() { return id; } public Long getUserId() { return userId; }
     public Long getPetId() { return petId; } public Long getCareItemId() { return careItemId; }
     public Long getRoutineId() { return routineId; } public String getRequestHash() { return requestHash; }
+    public LocalDate getActionDate() { return actionDate; }
+    public Long getGuidelineVersionId() { return guidelineVersionId; }
+    public SkipReasonCode getSkipReasonCode() { return skipReasonCode; }
     public RecordType getRecordType() { return recordType; } public RecordSource getSource() { return source; }
     public Instant getOccurredAt() { return occurredAt; } public TimePrecision getTimePrecision() { return timePrecision; }
     public FeedingOutcome getOutcome() { return outcome; } public BigDecimal getValueNum() { return valueNum; }

@@ -17,6 +17,9 @@ public class CareItem {
     @Column(name = "max_value", precision = 19, scale = 4) private BigDecimal maxValue;
     @Column(name = "outcome_allowed", nullable = false) private boolean outcomeAllowed;
     @Column(nullable = false) private boolean active;
+    @Column(name = "guideline_record_type", length = 20) private String guidelineRecordType;
+    @Column(name = "requires_input_model_extension", nullable = false)
+    private boolean requiresInputModelExtension;
 
     protected CareItem() {}
     public Long getId() { return id; }
@@ -28,4 +31,26 @@ public class CareItem {
     public BigDecimal getMaxValue() { return maxValue; }
     public boolean isOutcomeAllowed() { return outcomeAllowed; }
     public boolean isActive() { return active; }
+    public String getGuidelineRecordType() { return guidelineRecordType; }
+    public boolean isRequiresInputModelExtension() { return requiresInputModelExtension; }
+
+    public static CareItem guidelineItem(String code, String name, CareItemInputType inputType,
+            String unit, boolean outcomeAllowed, boolean active, String guidelineRecordType,
+            boolean requiresInputModelExtension) {
+        CareItem item = new CareItem();
+        item.code = code; item.name = name; item.inputType = inputType; item.unit = unit;
+        item.outcomeAllowed = outcomeAllowed; item.active = active;
+        item.guidelineRecordType = guidelineRecordType;
+        item.requiresInputModelExtension = requiresInputModelExtension;
+        return item;
+    }
+
+    public void updateGuidelineMetadata(String name, CareItemInputType inputType, String unit,
+            boolean outcomeAllowed, boolean active, String guidelineRecordType,
+            boolean requiresInputModelExtension) {
+        this.name = name; this.inputType = inputType; this.unit = unit;
+        this.outcomeAllowed = outcomeAllowed; this.active = active;
+        this.guidelineRecordType = guidelineRecordType;
+        this.requiresInputModelExtension = requiresInputModelExtension;
+    }
 }

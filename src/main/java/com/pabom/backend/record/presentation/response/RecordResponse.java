@@ -13,6 +13,7 @@ public record RecordResponse(
         OffsetDateTime updatedAt, @Schema(nullable = true) FeedingOutcome outcome,
         @Schema(nullable = true) BigDecimal valueNum, @Schema(nullable = true) String unit,
         @Schema(nullable = true) JsonNode detail, @Schema(nullable = true) String memo,
+        @Schema(nullable = true) SkipReasonCode reasonCode,
         @Schema(nullable = true) PhotoResponse photo,
         @Schema(nullable = true) String standardVersionLabel, int revisionNo,
         @Schema(nullable = true) OffsetDateTime deletedAt,

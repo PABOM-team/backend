@@ -5,6 +5,8 @@ import java.util.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.time.Instant;
+import java.time.LocalDate;
+import com.pabom.backend.record.domain.type.RecordType;
 
 public interface CareRecordJpaRepository extends JpaRepository<CareRecord, Long>, JpaSpecificationExecutor<CareRecord> {
     Optional<CareRecord> findByUserIdAndClientRequestId(Long userId, String clientRequestId);
@@ -15,6 +17,15 @@ public interface CareRecordJpaRepository extends JpaRepository<CareRecord, Long>
 
     Optional<CareRecord> findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
             Long userId, Long routineId);
+    Optional<CareRecord> findByRoutineIdAndActionDate(Long routineId, LocalDate actionDate);
+    boolean existsByRoutineIdAndActionDateAndIdNot(Long routineId, LocalDate actionDate, Long id);
+    Optional<CareRecord> findFirstByUserIdAndRoutineIdAndRecordTypeAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
+            Long userId, Long routineId, RecordType recordType);
+
+    List<CareRecord> findAllByUserIdAndRoutineIdInAndDeletedAtIsNull(
+            Long userId, Collection<Long> routineIds);
+
+    boolean existsByRoutineIdAndDeletedAtIsNull(Long routineId);
 
     List<CareRecord> findAllByUserId(Long userId);
 

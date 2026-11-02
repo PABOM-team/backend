@@ -1,0 +1,4 @@
+﻿stage_code,stage_name,display_order,has_own_guideline_rules,guideline_fallback_stage
+JUVENILE,어린 개체,1,true,
+ADULT,성체,2,true,
+UNKNOWN,확인 전,3,false,JUVENILE
