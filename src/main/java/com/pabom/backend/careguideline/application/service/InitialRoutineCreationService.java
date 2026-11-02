@@ -22,6 +22,7 @@ public class InitialRoutineCreationService {
     private final CareItemJpaRepository careItems;
     private final CareItemCodeMappingJpaRepository mappings;
     private final RoutineJpaRepository routines;
+    private final RoutineDueDateCalculator dueDateCalculator;
 
     public void createIfApplicable(Pet pet, Instant registeredAt) {
         Optional<CareGuidelineVersion> applicable = applicableGuidelines.findApplicable();
@@ -38,8 +39,6 @@ public class InitialRoutineCreationService {
         Map<Long, CareItemCodeMapping> mappingByGuidelineItem = new HashMap<>();
         mappings.findAll().stream().filter(mapping -> mapping.getGuidelineCareItemId() != null)
                 .forEach(mapping -> mappingByGuidelineItem.put(mapping.getGuidelineCareItemId(), mapping));
-        boolean unknown = pet.getLifeStageId() == null || !stage.getId().equals(pet.getLifeStageId());
-
         List<CareStandard> ordered = standards.stream().sorted(Comparator
                 .comparing((CareStandard standard) -> !"WEIGHT".equals(items.get(standard.getCareItemId()).getCode()))
                 .thenComparing(standard -> items.get(standard.getCareItemId()).getCode())).toList();
@@ -52,7 +51,8 @@ public class InitialRoutineCreationService {
             CareItemCodeMapping mapping = mappingByGuidelineItem.get(item.getId());
             if (mapping != null) compatibleItemIds.add(mapping.getLegacyCareItemId());
             if (routines.existsByPetIdAndCareItemIdIn(pet.getId(), compatibleItemIds)) continue;
-            Instant nextDueAt = unknown && "WEIGHT".equals(item.getCode()) ? registeredAt : null;
+            Instant nextDueAt = dueDateCalculator.firstDueAt(item.getCode(),
+                    standard.isDefaultEnabled(), standard.getDefaultCycleDays(), registeredAt);
             created.add(Routine.guideline(pet.getId(), item.getId(), standard.getDefaultCycleDays(),
                     standard.isDefaultEnabled(), version.getId(), nextDueAt, registeredAt));
         }

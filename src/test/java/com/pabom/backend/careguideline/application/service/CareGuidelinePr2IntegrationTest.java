@@ -127,7 +127,7 @@ class CareGuidelinePr2IntegrationTest {
     }
 
     @Test
-    void createsUnknownRoutinesOnceAndMakesWeightDueOnRegistrationDay() {
+    void createsUnknownRoutinesOnceWithJuvenileFallbackAndCalculatedDueDates() {
         UUID requestId = UUID.randomUUID();
         PetResult created = petCommandService.create(owner.getId(), command(requestId, null, Certainty.UNKNOWN));
         PetResult replay = petCommandService.create(owner.getId(), command(requestId, null, Certainty.UNKNOWN));
@@ -138,12 +138,42 @@ class CareGuidelinePr2IntegrationTest {
                 .allMatch(routine -> routine.getGuidelineVersionId().equals(
                         versions.findByVersionLabel("1.2").orElseThrow().getId()));
         assertThat(saved).anyMatch(routine -> !routine.isActive());
-        Routine weight = saved.stream().filter(routine ->
-                items.findById(routine.getCareItemId()).orElseThrow().getCode().equals("WEIGHT"))
-                .findFirst().orElseThrow();
-        assertThat(weight.getNextDueAt()).isEqualTo(NOW);
-        assertThat(saved).filteredOn(routine -> !routine.getId().equals(weight.getId()))
-                .allMatch(routine -> routine.getNextDueAt() == null);
+        Map<String, Routine> byCode = routinesByCode(created.id());
+        assertThat(byCode.get("FEED").getIntervalDays()).isEqualTo(1);
+        assertThat(byCode.get("FEED").getNextDueAt()).isEqualTo(NOW);
+        assertThat(byCode.get("HUMID_HIDE").getNextDueAt()).isEqualTo(NOW);
+        assertThat(byCode.get("WATER").getNextDueAt()).isEqualTo(NOW);
+        assertThat(byCode.get("WEIGHT").getNextDueAt()).isEqualTo(NOW);
+        assertThat(byCode.get("MULTIVITAMIN").getNextDueAt()).isEqualTo(NOW.plus(7, java.time.temporal.ChronoUnit.DAYS));
+        assertThat(byCode.get("SHED_CHECK").getNextDueAt()).isEqualTo(NOW.plus(7, java.time.temporal.ChronoUnit.DAYS));
+        assertThat(byCode.get("CLEAN").getNextDueAt()).isEqualTo(NOW.plus(30, java.time.temporal.ChronoUnit.DAYS));
+        assertThat(byCode.get("UVB_LAMP").getNextDueAt()).isNull();
+        assertThat(routineQueryService.get(owner.getId(), created.id())).filteredOn(result ->
+                        result.careItemCode().equals("FEED"))
+                .singleElement().extracting(PetRoutineResult::nextDueAt)
+                .isEqualTo(OffsetDateTime.ofInstant(NOW, ApplicableCareGuidelineService.SERVICE_ZONE));
+    }
+
+    @Test
+    void appliesSpeciesSpecificItemsAndDefaultDisabledSchedules() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        Species ballPython = species.findByCode("BALL_PYTHON").orElseThrow();
+
+        PetResult crestedPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        PetResult ballPythonPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), ballPython.getId(), null, Certainty.UNKNOWN));
+
+        Map<String, Routine> crestedRoutines = routinesByCode(crestedPet.id());
+        Map<String, Routine> ballPythonRoutines = routinesByCode(ballPythonPet.id());
+        assertThat(crestedRoutines).containsKeys("MIST", "FEED_INSECT")
+                .doesNotContainKeys("HUMID_HIDE", "MULTIVITAMIN");
+        assertThat(crestedRoutines.get("MIST").getNextDueAt()).isEqualTo(NOW);
+        assertThat(crestedRoutines.get("FEED_INSECT").isActive()).isFalse();
+        assertThat(crestedRoutines.get("FEED_INSECT").getNextDueAt()).isNull();
+        assertThat(ballPythonRoutines).containsKey("MIST")
+                .doesNotContainKeys("FEED_INSECT", "HUMID_HIDE", "MULTIVITAMIN");
+        assertThat(ballPythonRoutines.get("MIST").getNextDueAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -202,9 +232,19 @@ class CareGuidelinePr2IntegrationTest {
     }
 
     private CreatePetCommand command(UUID requestId, Long stageId, Certainty certainty) {
-        return new CreatePetCommand(requestId, leopard.getId(), "테스트", List.of(), null,
+        return command(requestId, leopard.getId(), stageId, certainty);
+    }
+
+    private CreatePetCommand command(UUID requestId, Long speciesId, Long stageId, Certainty certainty) {
+        return new CreatePetCommand(requestId, speciesId, "테스트", List.of(), null,
                 LocalDate.of(2026, 1, 1), null, stageId, certainty,
                 Sex.UNKNOWN, Certainty.UNKNOWN, null);
+    }
+
+    private Map<String, Routine> routinesByCode(Long petId) {
+        return routines.findAllByPetIdOrderByIdAsc(petId).stream().collect(java.util.stream.Collectors.toMap(
+                routine -> items.findById(routine.getCareItemId()).orElseThrow().getCode(),
+                routine -> routine));
     }
 
     private LifeStage stage(String code) {
