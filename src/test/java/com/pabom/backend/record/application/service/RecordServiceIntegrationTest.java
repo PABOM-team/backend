@@ -110,7 +110,9 @@ class RecordServiceIntegrationTest {
         given(storage.createDownloadUrl(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).willReturn("https://example.test/photo");
         CreateRecordRequest request=new CreateRecordRequest(UUID.randomUUID(),pet.getId(),"FEEDING",OffsetDateTime.now(clock).minusHours(1),TimePrecision.EXACT,FeedingOutcome.ATE_ALL,null,null,null,photo.getId(),100);
         RecordMutationResponse result=service.create(owner.getId(),request);
-        assertThat(result.record().routineId()).isEqualTo(routine.getId()); assertThat(result.routineUpdated().nextDueAt()).isEqualTo(result.record().occurredAt().plusDays(7));
+        assertThat(result.record().routineId()).isEqualTo(routine.getId());
+        assertThat(result.routineUpdated().nextDueAt()).isEqualTo(result.record().occurredAt().toLocalDate()
+                .plusDays(7).atTime(12, 0).atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime());
         assertThat(result.record().photo().url()).isEqualTo("https://example.test/photo");
         service.delete(owner.getId(),result.record().id()); assertThat(routines.findById(routine.getId()).orElseThrow().getNextDueAt()).isNull();
     }

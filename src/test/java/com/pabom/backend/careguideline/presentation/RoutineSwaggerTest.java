@@ -24,6 +24,10 @@ class RoutineSwaggerTest {
                 .andExpect(jsonPath("$.paths['/api/v1/today'].get.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}'].patch.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/reset'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/skip'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/postpone'].post.responses['200']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.security[0].Authorization").isArray())
                 .andExpect(jsonPath("$.paths['/api/v1/today'].get.security[0].Authorization").isArray())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}'].patch.requestBody.content['application/json'].schema['$ref']").exists())
                 .andExpect(jsonPath("$.components.schemas.UpdateRoutineRequest.properties.reason.enum",

@@ -3,10 +3,16 @@ package com.pabom.backend.careguideline.presentation;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.careguideline.application.result.RoutineMutationResult;
 import com.pabom.backend.careguideline.application.result.TodayResult;
+import com.pabom.backend.careguideline.application.result.RoutineActionResult;
+import com.pabom.backend.careguideline.application.result.RoutinePostponeResult;
+import com.pabom.backend.careguideline.application.service.RoutineActionService;
 import com.pabom.backend.careguideline.application.service.RoutineCommandService;
 import com.pabom.backend.careguideline.application.service.TodayQueryService;
 import com.pabom.backend.careguideline.presentation.docs.RoutineControllerDocs;
 import com.pabom.backend.careguideline.presentation.request.UpdateRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.SkipRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.PostponeRoutineRequest;
 import com.pabom.backend.global.error.BaseErrorCode;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.response.ApiResponseBody;
@@ -34,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RoutineController implements RoutineControllerDocs {
     private final TodayQueryService todayQueryService;
     private final RoutineCommandService routineCommandService;
+    private final RoutineActionService routineActionService;
 
     @Override
     @GetMapping("/today")
@@ -68,6 +75,36 @@ public class RoutineController implements RoutineControllerDocs {
         requireAuthentication(authUser, request);
         return ResponseEntity.ok(ApiResponseBody.success(
                 routineCommandService.reset(authUser.userId(), routineId), request));
+    }
+
+    @Override
+    @PostMapping(value = "/routines/{routineId}/complete", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponseBody<RoutineActionResult>> complete(@PathVariable Long routineId,
+            @AuthenticationPrincipal AuthUser authUser, @Valid @RequestBody CompleteRoutineRequest body,
+            HttpServletRequest request) {
+        requireAuthentication(authUser, request);
+        return ResponseEntity.ok(ApiResponseBody.success(
+                routineActionService.complete(authUser.userId(), routineId, body), request));
+    }
+
+    @Override
+    @PostMapping(value = "/routines/{routineId}/skip", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponseBody<RoutineActionResult>> skip(@PathVariable Long routineId,
+            @AuthenticationPrincipal AuthUser authUser, @Valid @RequestBody SkipRoutineRequest body,
+            HttpServletRequest request) {
+        requireAuthentication(authUser, request);
+        return ResponseEntity.ok(ApiResponseBody.success(
+                routineActionService.skip(authUser.userId(), routineId, body), request));
+    }
+
+    @Override
+    @PostMapping(value = "/routines/{routineId}/postpone", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponseBody<RoutinePostponeResult>> postpone(@PathVariable Long routineId,
+            @AuthenticationPrincipal AuthUser authUser, @RequestBody PostponeRoutineRequest body,
+            HttpServletRequest request) {
+        requireAuthentication(authUser, request);
+        return ResponseEntity.ok(ApiResponseBody.success(
+                routineActionService.postpone(authUser.userId(), routineId, body), request));
     }
 
     private void requireAuthentication(AuthUser user, HttpServletRequest request) {

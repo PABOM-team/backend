@@ -13,6 +13,7 @@ import com.pabom.backend.careguideline.application.result.TodayEmptyReason;
 import com.pabom.backend.careguideline.application.result.TodayResult;
 import com.pabom.backend.careguideline.application.service.RoutineCommandService;
 import com.pabom.backend.careguideline.application.service.TodayQueryService;
+import com.pabom.backend.careguideline.application.service.RoutineActionService;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.error.GlobalExceptionHandler;
 import com.pabom.backend.global.security.AuthUser;
@@ -32,13 +33,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class RoutineControllerTest {
     private TodayQueryService todayService;
     private RoutineCommandService commandService;
+    private RoutineActionService actionService;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         todayService = org.mockito.Mockito.mock(TodayQueryService.class);
         commandService = org.mockito.Mockito.mock(RoutineCommandService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new RoutineController(todayService, commandService))
+        actionService = org.mockito.Mockito.mock(RoutineActionService.class);
+        mvc = MockMvcBuilders.standaloneSetup(new RoutineController(todayService, commandService, actionService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         SecurityContextHolder.getContext().setAuthentication(
@@ -51,7 +54,7 @@ class RoutineControllerTest {
     }
 
     @Test
-    void exposesThreeAuthenticatedEndpoints() throws Exception {
+    void exposesAuthenticatedRoutineEndpoints() throws Exception {
         given(todayService.get(eq(7L), eq(10L), eq(LocalDate.of(2026, 11, 2))))
                 .willReturn(new TodayResult(LocalDate.of(2026, 11, 2),
                         new TodayResult.Summary(0, 0, 0, 0, 0, 0),
@@ -64,6 +67,15 @@ class RoutineControllerTest {
                         .content("{\"intervalDays\":5}"))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/v1/routines/10/reset"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/routines/10/complete").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientRequestId\":\"c67c4e3d-fd4e-49bd-83f5-3c7d7b64c981\",\"outcome\":\"ATE_ALL\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/routines/10/skip").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientRequestId\":\"4d0a0e9e-0c2b-4b47-b755-479ecf2ac18b\",\"reasonCode\":\"SCHEDULE\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/routines/10/postpone").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"postponeTo\":\"2026-12-10\"}"))
                 .andExpect(status().isOk());
     }
 

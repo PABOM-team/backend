@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
+import com.pabom.backend.careguideline.application.service.RoutineDueDateCalculator;
 import com.pabom.backend.file.application.port.FileStoragePort;
 import com.pabom.backend.file.domain.entity.File;
 import com.pabom.backend.file.domain.error.FileErrorCode;
@@ -54,6 +55,7 @@ public class RecordService {
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final RoutineDueDateCalculator dueDates;
 
     @Transactional
     public RecordMutationResponse create(Long userId, CreateRecordRequest request) {
@@ -120,6 +122,9 @@ public class RecordService {
         boolean firstResult = record.getOutcome() == null && outcome != null;
         Instant now = clock.instant();
         record.edit(occurredAt, precision, outcome, value, json(detail), memo, photoId, now);
+        if (record.getActionDate() != null && records.existsByRoutineIdAndActionDateAndIdNot(
+                record.getRoutineId(), record.getActionDate(), record.getId()))
+            throw error(RecordErrorCode.RECORD_CONFLICT);
         records.saveAndFlush(record);
         ObjectNode after = snapshot(record);
         List<String> changed = changed(before, after);
@@ -279,10 +284,15 @@ public class RecordService {
     }
     private RoutineUpdatedResponse recalculate(Long userId, Routine routine, Instant now) {
         if (routine == null) return null;
-        Instant next = records.findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(userId, routine.getId())
-                .map(CareRecord::getOccurredAt).map(time -> routine.getIntervalDays() == null ? null
-                        : time.plus(routine.getIntervalDays(), ChronoUnit.DAYS)).orElse(null);
-        routine.updateNextDueAt(next, now); routines.save(routine);
+        CareRecord latest = records.findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
+                userId, routine.getId()).orElse(null);
+        Instant next = latest == null || routine.getIntervalDays() == null ? null
+                : dueDates.nextDueAfterCompletion(dueDates.toServiceDate(latest.getOccurredAt()), routine.getIntervalDays());
+        LocalDate lastDoneOn = records
+                .findFirstByUserIdAndRoutineIdAndRecordTypeAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
+                        userId, routine.getId(), RecordType.DONE)
+                .map(CareRecord::getOccurredAt).map(dueDates::toServiceDate).orElse(null);
+        routine.recalculateAfterRecordChange(lastDoneOn, next, now); routines.save(routine);
         return new RoutineUpdatedResponse(routine.getId(), atKst(next));
     }
     private RoutineUpdatedResponse currentRoutine(Routine routine) {
@@ -306,7 +316,8 @@ public class RecordService {
         return new RecordResponse(record.getId(), record.getPetId(), pet.getName(), record.getRoutineId(),
                 item.getCode(), item.getName(), record.getRecordType(), record.getSource(), atKst(record.getOccurredAt()),
                 record.getTimePrecision(), atKst(record.getCreatedAt()), atKst(record.getUpdatedAt()), record.getOutcome(),
-                record.getValueNum(), item.getUnit(), parse(record.getDetailJson()), record.getMemo(), photo,
+                record.getValueNum(), item.getUnit(), parse(record.getDetailJson()), record.getMemo(),
+                record.getSkipReasonCode(), photo,
                 record.getStandardVersionLabel(), record.getRevisionNo(), atKst(record.getDeletedAt()),
                 record.getDeletedAt() == null ? null : atKst(record.getDeletedAt().plus(RESTORE_WINDOW)));
     }
@@ -317,7 +328,8 @@ public class RecordService {
         return new RecordListItemResponse(record.getId(), record.getPetId(), pet.getName(), item.getCode(), item.getName(),
                 record.getRecordType(), atKst(record.getOccurredAt()), record.getTimePrecision(), atKst(record.getCreatedAt()),
                 record.getOutcome(), false, record.getValueNum(), item.getUnit(), summary(record, item), preview,
-                record.getPhotoFileId() != null, record.getRevisionNo() > 1, record.getSource(), atKst(record.getDeletedAt()));
+                record.getSkipReasonCode(), record.getPhotoFileId() != null, record.getRevisionNo() > 1,
+                record.getSource(), atKst(record.getDeletedAt()));
     }
     private String summary(CareRecord record, CareItem item) {
         if (record.getOutcome() != null) return switch (record.getOutcome()) {

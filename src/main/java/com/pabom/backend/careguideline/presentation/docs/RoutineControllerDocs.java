@@ -4,7 +4,12 @@ import static com.pabom.backend.careguideline.presentation.docs.RoutineOpenApiEx
 
 import com.pabom.backend.careguideline.application.result.RoutineMutationResult;
 import com.pabom.backend.careguideline.application.result.TodayResult;
+import com.pabom.backend.careguideline.application.result.RoutineActionResult;
+import com.pabom.backend.careguideline.application.result.RoutinePostponeResult;
 import com.pabom.backend.careguideline.presentation.request.UpdateRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.SkipRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.PostponeRoutineRequest;
 import com.pabom.backend.config.OpenApiSchemas;
 import com.pabom.backend.config.SwaggerConfig;
 import com.pabom.backend.global.response.ApiResponseBody;
@@ -53,4 +58,40 @@ public interface RoutineControllerDocs {
     })
     ResponseEntity<ApiResponseBody<RoutineMutationResult>> reset(Long routineId, AuthUser authUser,
             HttpServletRequest request);
+
+    @Operation(summary = "루틴 완료", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "완료 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutineActionEnvelope.class))),
+            @ApiResponse(responseCode = "400", description = "요청 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = VALIDATION_FAILED))),
+            @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = AUTH_REQUIRED))),
+            @ApiResponse(responseCode = "404", description = "루틴 없음", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = ROUTINE_NOT_FOUND))),
+            @ApiResponse(responseCode = "409", description = "중복 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "422", description = "결과 또는 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class)))
+    })
+    ResponseEntity<ApiResponseBody<RoutineActionResult>> complete(Long routineId, AuthUser authUser,
+            CompleteRoutineRequest body, HttpServletRequest request);
+
+    @Operation(summary = "루틴 건너뛰기", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "건너뛰기 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutineActionEnvelope.class))),
+            @ApiResponse(responseCode = "400", description = "요청 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "404", description = "루틴 없음", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "409", description = "중복 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "422", description = "날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class)))
+    })
+    ResponseEntity<ApiResponseBody<RoutineActionResult>> skip(Long routineId, AuthUser authUser,
+            SkipRoutineRequest body, HttpServletRequest request);
+
+    @Operation(summary = "루틴 미루기 또는 취소", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "미루기 변경 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutinePostponeEnvelope.class))),
+            @ApiResponse(responseCode = "400", description = "요청 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "404", description = "루틴 없음", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "409", description = "취소 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
+            @ApiResponse(responseCode = "422", description = "미루기 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class)))
+    })
+    ResponseEntity<ApiResponseBody<RoutinePostponeResult>> postpone(Long routineId, AuthUser authUser,
+            PostponeRoutineRequest body, HttpServletRequest request);
 }

@@ -105,6 +105,7 @@ class DatabaseMigrationTest {
                 ,"care_stage_thresholds"
                 ,"care_item_descriptions"
                 ,"care_item_code_mappings"
+                ,"routine_postponement_events"
         );
     }
 
@@ -193,7 +194,11 @@ class DatabaseMigrationTest {
                 "pk_care_records",
                 "uk_care_records_user_client_request",
                 "pk_care_record_revisions",
-                "fk_care_record_revisions_record"
+                "fk_care_record_revisions_record",
+                "uk_care_records_routine_action_date",
+                "fk_care_records_guideline_version",
+                "pk_routine_postponement_events",
+                "fk_routine_postponement_events_routine"
         );
         assertThat(indexes).contains(
                 "idx_refresh_tokens_family_id",
@@ -205,7 +210,8 @@ class DatabaseMigrationTest {
                 "idx_pet_morphs_morph_id"
                 ,"idx_routines_pet_active",
                 "idx_care_records_user_occurred",
-                "idx_care_record_revisions_record"
+                "idx_care_record_revisions_record",
+                "idx_routine_postponement_events_routine"
         );
     }
 

@@ -116,8 +116,9 @@ public class TodayQueryService {
             } else if (nextDueDate != null && !nextDueDate.isAfter(date)) {
                 taskDueDate = nextDueDate;
                 if (nextDueDate.isBefore(date)) {
-                    status = TodayTaskStatus.OVERDUE;
                     overdueDays = Math.toIntExact(ChronoUnit.DAYS.between(nextDueDate, date));
+                    if (overdueDays >= 7) continue;
+                    status = TodayTaskStatus.OVERDUE;
                 } else {
                     status = TodayTaskStatus.DUE;
                 }

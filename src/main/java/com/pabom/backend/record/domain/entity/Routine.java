@@ -15,6 +15,9 @@ public class Routine {
     @Column(nullable = false) private boolean active;
     @Column(name = "interval_days") private Integer intervalDays;
     @Column(name = "next_due_at") private Instant nextDueAt;
+    @Column(name = "last_done_on") private LocalDate lastDoneOn;
+    @Column(name = "postponed_base_due") private LocalDate postponedBaseDue;
+    @Column(name = "postponed_at") private Instant postponedAt;
     @Column(name = "start_date") private LocalDate startDate;
     @Column(name = "start_date_custom", nullable = false) private boolean startDateCustom;
     @Column(name = "guideline_version_id") private Long guidelineVersionId;
@@ -46,6 +49,32 @@ public class Routine {
         return routine;
     }
     public void updateNextDueAt(Instant nextDueAt, Instant now) { this.nextDueAt = nextDueAt; this.updatedAt = now; }
+    public void finishOccurrence(LocalDate actionDate, boolean done, Instant nextDueAt, Instant now) {
+        if (done) this.lastDoneOn = actionDate;
+        this.nextDueAt = nextDueAt;
+        this.postponedBaseDue = null;
+        this.postponedAt = null;
+        this.updatedAt = now;
+    }
+    public void postpone(LocalDate baseDue, Instant nextDueAt, Instant now) {
+        if (this.postponedBaseDue == null) this.postponedBaseDue = baseDue;
+        this.nextDueAt = nextDueAt;
+        this.postponedAt = now;
+        this.updatedAt = now;
+    }
+    public void cancelPostponement(Instant restoredDueAt, Instant now) {
+        this.nextDueAt = restoredDueAt;
+        this.postponedBaseDue = null;
+        this.postponedAt = null;
+        this.updatedAt = now;
+    }
+    public void recalculateAfterRecordChange(LocalDate lastDoneOn, Instant nextDueAt, Instant now) {
+        this.lastDoneOn = lastDoneOn;
+        this.nextDueAt = nextDueAt;
+        this.postponedBaseDue = null;
+        this.postponedAt = null;
+        this.updatedAt = now;
+    }
     public void customize(Integer intervalDays, Boolean active, LocalDate startDate,
             boolean startDateCustom, Instant nextDueAt, boolean cycleCustomized,
             RoutineModificationReason reason, String reasonNote, Instant now) {
@@ -80,6 +109,9 @@ public class Routine {
     public boolean isActive() { return active; }
     public Integer getIntervalDays() { return intervalDays; }
     public Instant getNextDueAt() { return nextDueAt; }
+    public LocalDate getLastDoneOn() { return lastDoneOn; }
+    public LocalDate getPostponedBaseDue() { return postponedBaseDue; }
+    public Instant getPostponedAt() { return postponedAt; }
     public LocalDate getStartDate() { return startDate; }
     public boolean isStartDateCustom() { return startDateCustom; }
     public Long getGuidelineVersionId() { return guidelineVersionId; }
