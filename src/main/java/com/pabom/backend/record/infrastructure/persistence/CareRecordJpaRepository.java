@@ -16,6 +16,11 @@ public interface CareRecordJpaRepository extends JpaRepository<CareRecord, Long>
     Optional<CareRecord> findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
             Long userId, Long routineId);
 
+    List<CareRecord> findAllByUserIdAndRoutineIdInAndDeletedAtIsNull(
+            Long userId, Collection<Long> routineIds);
+
+    boolean existsByRoutineIdAndDeletedAtIsNull(Long routineId);
+
     List<CareRecord> findAllByUserId(Long userId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.*;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.careguideline.application.command.CareGuidelineImportFiles;
 import com.pabom.backend.careguideline.application.result.PetRoutineResult;
+import com.pabom.backend.careguideline.application.result.TodayEmptyReason;
+import com.pabom.backend.careguideline.application.result.TodayTaskStatus;
 import com.pabom.backend.careguideline.domain.type.CareGuidelineImportMode;
 import com.pabom.backend.careguideline.domain.entity.CareGuidelineVersion;
 import com.pabom.backend.careguideline.domain.error.CareGuidelineQueryErrorCode;
@@ -17,10 +19,18 @@ import com.pabom.backend.pet.domain.error.PetErrorCode;
 import com.pabom.backend.pet.domain.type.Certainty;
 import com.pabom.backend.pet.domain.type.Sex;
 import com.pabom.backend.record.domain.entity.CareItem;
+import com.pabom.backend.record.domain.entity.CareRecord;
 import com.pabom.backend.record.domain.entity.Routine;
 import com.pabom.backend.record.domain.type.CycleSource;
+import com.pabom.backend.record.domain.type.FeedingOutcome;
+import com.pabom.backend.record.domain.type.RecordType;
+import com.pabom.backend.record.domain.type.TimePrecision;
 import com.pabom.backend.record.infrastructure.persistence.CareItemJpaRepository;
+import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaRepository;
 import com.pabom.backend.record.infrastructure.persistence.RoutineJpaRepository;
+import com.pabom.backend.careguideline.presentation.request.UpdateRoutineRequest;
+import com.pabom.backend.global.error.BaseErrorCode;
+import com.pabom.backend.record.domain.error.RoutineErrorCode;
 import com.pabom.backend.species.domain.entity.LifeStage;
 import com.pabom.backend.species.domain.entity.Species;
 import com.pabom.backend.species.infrastructure.persistence.LifeStageJpaRepository;
@@ -69,6 +79,9 @@ class CareGuidelinePr2IntegrationTest {
     @Autowired CareItemJpaRepository items;
     @Autowired CareGuidelineVersionJpaRepository versions;
     @Autowired ApplicableCareGuidelineService applicableGuidelines;
+    @Autowired TodayQueryService todayQueryService;
+    @Autowired RoutineCommandService routineCommandService;
+    @Autowired CareRecordJpaRepository records;
 
     User owner;
     User other;
@@ -190,8 +203,10 @@ class CareGuidelinePr2IntegrationTest {
 
         PetRoutineResult result = routineQueryService.get(owner.getId(), pet.id()).stream()
                 .filter(routine -> routine.careItemCode().equals("FEED")).findFirst().orElseThrow();
-        assertThat(result.defaultCycleDays()).isEqualTo(3);
-        assertThat(result.isOutOfRange()).isTrue();
+        assertThat(result.defaultCycleDays()).isNull();
+        assertThat(result.minDays()).isNull();
+        assertThat(result.maxDays()).isNull();
+        assertThat(result.isOutOfRange()).isNull();
         assertThat(result.cycleSource()).isEqualTo(CycleSource.USER_CUSTOM);
     }
 
@@ -231,6 +246,135 @@ class CareGuidelinePr2IntegrationTest {
         assertThat(routines.findAllByPetIdOrderByIdAsc(replacement.id())).hasSize(originalRoutineCount);
     }
 
+    @Test
+    void returnsDueAndSingleOverdueTaskWithSummaryAndNextUpcoming() {
+        PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
+        Map<String, Routine> byCode = routinesByCode(pet.id());
+        Instant nov2Noon = Instant.parse("2026-11-02T03:00:00Z");
+        byCode.get("WATER").updateNextDueAt(nov2Noon, NOW);
+        byCode.values().stream().filter(routine -> !Set.of("FEED", "WATER", "CLEAN").contains(
+                        items.findById(routine.getCareItemId()).orElseThrow().getCode()))
+                .forEach(this::disable);
+        routines.saveAll(byCode.values());
+
+        var result = todayQueryService.get(owner.getId(), null, LocalDate.of(2026, 11, 2));
+
+        assertThat(result.pets()).singleElement().satisfies(group -> assertThat(group.tasks())
+                .extracting(task -> task.status(), task -> task.routineId())
+                .containsExactly(tuple(TodayTaskStatus.OVERDUE, byCode.get("FEED").getId()),
+                        tuple(TodayTaskStatus.DUE, byCode.get("WATER").getId())));
+        assertThat(result.summary().overdueCount()).isEqualTo(1);
+        assertThat(result.summary().dueCount()).isEqualTo(1);
+        assertThat(result.pets().getFirst().tasks().getFirst().overdueDays()).isEqualTo(1);
+        assertThat(result.nextUpcoming().itemCode()).isEqualTo("CLEAN");
+        assertThat(result.emptyReason()).isNull();
+    }
+
+    @Test
+    void calculatesDoneSkippedAndNeedsResultWithoutDuplicateRoutineCards() {
+        PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
+        Map<String, Routine> byCode = routinesByCode(pet.id());
+        byCode.values().stream().filter(routine -> !Set.of("FEED", "WATER", "WEIGHT").contains(
+                        items.findById(routine.getCareItemId()).orElseThrow().getCode()))
+                .forEach(this::disable);
+        routines.saveAll(byCode.values());
+        Instant occurred = Instant.parse("2026-11-02T03:00:00Z");
+        saveRecord(pet.id(), byCode.get("FEED"), occurred, RecordType.DONE, null);
+        saveRecord(pet.id(), byCode.get("WATER"), occurred, RecordType.DONE, null);
+        saveRecord(pet.id(), byCode.get("WEIGHT"), occurred, RecordType.SKIPPED, null);
+
+        var result = todayQueryService.get(owner.getId(), pet.id(), LocalDate.of(2026, 11, 2));
+
+        assertThat(result.pets().getFirst().tasks()).hasSize(3)
+                .extracting(task -> task.status())
+                .containsExactly(TodayTaskStatus.NEEDS_RESULT, TodayTaskStatus.SKIPPED, TodayTaskStatus.DONE);
+        assertThat(result.summary().needsResultCount()).isEqualTo(1);
+        assertThat(result.summary().doneCount()).isEqualTo(1);
+        assertThat(result.summary().skippedCount()).isEqualTo(1);
+        assertThat(result.emptyReason()).isNull();
+
+        saveRecord(pet.id(), byCode.get("FEED"), occurred.plusSeconds(1), RecordType.DONE, FeedingOutcome.ATE_ALL);
+        var allDone = todayQueryService.get(owner.getId(), pet.id(), LocalDate.of(2026, 11, 2));
+        assertThat(allDone.pets().getFirst().tasks()).hasSize(3);
+        assertThat(allDone.emptyReason()).isEqualTo(TodayEmptyReason.ALL_DONE);
+    }
+
+    @Test
+    void returnsEmptyReasonsAndRejectsOtherUsersPetFilter() {
+        assertThat(todayQueryService.get(other.getId(), null, LocalDate.of(2026, 11, 2)).emptyReason())
+                .isEqualTo(TodayEmptyReason.NO_PETS);
+        PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
+        routinesByCode(pet.id()).values().forEach(this::disable);
+
+        assertThat(todayQueryService.get(owner.getId(), null, LocalDate.of(2026, 11, 2)).emptyReason())
+                .isEqualTo(TodayEmptyReason.NOTHING_DUE);
+        assertThatThrownBy(() -> todayQueryService.get(other.getId(), pet.id(), LocalDate.of(2026, 11, 2)))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void customizesCycleStartDateAndActivatesDefaultDisabledRoutine() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        Map<String, Routine> byCode = routinesByCode(pet.id());
+        UpdateRoutineRequest feedUpdate = new UpdateRoutineRequest();
+        feedUpdate.setIntervalDays(365);
+        feedUpdate.setStartDate(LocalDate.of(2026, 11, 5));
+        feedUpdate.setReason(com.pabom.backend.record.domain.type.RoutineModificationReason.PREFERENCE);
+        feedUpdate.setReasonNote("사용자 지정");
+
+        var updated = routineCommandService.update(owner.getId(), byCode.get("FEED").getId(), feedUpdate);
+
+        assertThat(updated.routine().cycleSource()).isEqualTo(CycleSource.USER_CUSTOM);
+        assertThat(updated.routine().defaultCycleDays()).isNull();
+        assertThat(updated.routine().isOutOfRange()).isNull();
+        assertThat(updated.routine().startDate()).isEqualTo(LocalDate.of(2026, 11, 5));
+        assertThat(updated.routine().nextDueAt()).isEqualTo(OffsetDateTime.parse("2026-11-05T12:00:00+09:00"));
+        assertThat(updated.routine().reasonNote()).isEqualTo("사용자 지정");
+
+        UpdateRoutineRequest enable = new UpdateRoutineRequest();
+        enable.setIsEnabled(true);
+        var insect = routineCommandService.update(owner.getId(), byCode.get("FEED_INSECT").getId(), enable);
+        assertThat(insect.routine().nextDueAt()).isEqualTo(OffsetDateTime.parse("2026-11-08T12:00:00+09:00"));
+    }
+
+    @Test
+    void recalculatesFromLastRecordLocksStartDateAndResetsToCurrentGuideline() {
+        PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
+        Routine feed = routinesByCode(pet.id()).get("FEED");
+        saveRecord(pet.id(), feed, Instant.parse("2026-11-04T03:00:00Z"), RecordType.DONE, FeedingOutcome.ATE_ALL);
+        UpdateRoutineRequest interval = new UpdateRoutineRequest();
+        interval.setIntervalDays(5);
+        routineCommandService.update(owner.getId(), feed.getId(), interval);
+        assertThat(routines.findById(feed.getId()).orElseThrow().getNextDueAt())
+                .isEqualTo(Instant.parse("2026-11-09T03:00:00Z"));
+
+        UpdateRoutineRequest start = new UpdateRoutineRequest();
+        start.setStartDate(LocalDate.of(2026, 11, 10));
+        assertThatThrownBy(() -> routineCommandService.update(owner.getId(), feed.getId(), start))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode()).isEqualTo(RoutineErrorCode.ROUTINE_START_DATE_LOCKED));
+
+        var reset = routineCommandService.reset(owner.getId(), feed.getId());
+        assertThat(reset.routine().cycleSource()).isEqualTo(CycleSource.GUIDELINE);
+        assertThat(reset.routine().intervalDays()).isEqualTo(1);
+        assertThat(reset.routine().nextDueAt()).isEqualTo(OffsetDateTime.parse("2026-11-05T12:00:00+09:00"));
+        assertThat(records.findAllByUserId(owner.getId())).hasSize(1);
+    }
+
+    @Test
+    void rejectsResetWhenCurrentGuidelineHasNoMatchingStandard() {
+        PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
+        CareItem memo = items.findByCode("MEMO").orElseThrow();
+        Routine routine = routines.saveAndFlush(Routine.active(pet.id(), memo.getId(), 7, NOW));
+
+        assertThatThrownBy(() -> routineCommandService.reset(owner.getId(), routine.getId()))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.errorCode()).isEqualTo(
+                                CareGuidelineQueryErrorCode.CARE_STANDARD_NOT_FOUND));
+    }
+
     private CreatePetCommand command(UUID requestId, Long stageId, Certainty certainty) {
         return command(requestId, leopard.getId(), stageId, certainty);
     }
@@ -245,6 +389,21 @@ class CareGuidelinePr2IntegrationTest {
         return routines.findAllByPetIdOrderByIdAsc(petId).stream().collect(java.util.stream.Collectors.toMap(
                 routine -> items.findById(routine.getCareItemId()).orElseThrow().getCode(),
                 routine -> routine));
+    }
+
+    private void disable(Routine routine) {
+        routine.customize(null, false, routine.getStartDate(), routine.isStartDateCustom(),
+                routine.getNextDueAt(), false, routine.getModificationReason(),
+                routine.getModificationReasonNote(), NOW);
+    }
+
+    private CareRecord saveRecord(Long petId, Routine routine, Instant occurredAt,
+            RecordType recordType, FeedingOutcome outcome) {
+        CareRecord record = CareRecord.manual(owner.getId(), petId, routine.getCareItemId(), routine.getId(),
+                UUID.randomUUID().toString(), UUID.randomUUID().toString().replace("-", ""),
+                occurredAt, TimePrecision.DATE_ONLY, outcome, null, null, null, null, NOW);
+        ReflectionTestUtils.setField(record, "recordType", recordType);
+        return records.saveAndFlush(record);
     }
 
     private LifeStage stage(String code) {

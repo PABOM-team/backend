@@ -53,8 +53,10 @@ public class InitialRoutineCreationService {
             if (routines.existsByPetIdAndCareItemIdIn(pet.getId(), compatibleItemIds)) continue;
             Instant nextDueAt = dueDateCalculator.firstDueAt(item.getCode(),
                     standard.isDefaultEnabled(), standard.getDefaultCycleDays(), registeredAt);
+            java.time.LocalDate startDate = nextDueAt == null ? null
+                    : dueDateCalculator.toServiceDate(nextDueAt);
             created.add(Routine.guideline(pet.getId(), item.getId(), standard.getDefaultCycleDays(),
-                    standard.isDefaultEnabled(), version.getId(), nextDueAt, registeredAt));
+                    standard.isDefaultEnabled(), version.getId(), startDate, nextDueAt, registeredAt));
         }
         routines.saveAll(created);
     }

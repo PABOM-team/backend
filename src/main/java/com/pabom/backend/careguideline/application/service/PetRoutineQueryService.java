@@ -79,7 +79,8 @@ public class PetRoutineQueryService {
                     .or(() -> descriptions.findByGuidelineVersionIdAndSpeciesIdIsNullAndCareItemId(versionId, canonicalItemId))
                     .map(CareItemDescription::getDescriptionText).orElse(null);
             Integer interval = routine.getIntervalDays();
-            Boolean outOfRange = standard == null || interval == null ? null
+            boolean custom = routine.getCycleSource() == CycleSource.USER_CUSTOM;
+            Boolean outOfRange = custom || standard == null || interval == null ? null
                     : interval < standard.getMinDays() || interval > standard.getMaxDays();
             String code = item == null ? null : item.getCode();
             String name = item == null ? null : item.getName();
@@ -89,11 +90,12 @@ public class PetRoutineQueryService {
             CareGuidelineVersion version = versionId == null ? null : versionById.get(versionId);
             return new PetRoutineResult(routine.getId(), petId, code, name, routine.isActive(), interval,
                     routine.getCycleSource() == null ? CycleSource.USER_CUSTOM : routine.getCycleSource(),
-                    standard == null ? null : standard.getDefaultCycleDays(),
-                    standard == null ? null : standard.getMinDays(),
-                    standard == null ? null : standard.getMaxDays(), outOfRange,
+                    custom || standard == null ? null : standard.getDefaultCycleDays(),
+                    custom || standard == null ? null : standard.getMinDays(),
+                    custom || standard == null ? null : standard.getMaxDays(), outOfRange,
                     routine.getNextDueAt() == null ? null : OffsetDateTime.ofInstant(
                             routine.getNextDueAt(), ApplicableCareGuidelineService.SERVICE_ZONE),
+                    routine.getStartDate(),
                     version == null ? null : version.getVersionLabel(),
                     standard == null ? item == null ? null : item.getGuidelineRecordType() : standard.getRecordType(),
                     description);

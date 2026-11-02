@@ -10,6 +10,8 @@ import com.pabom.backend.record.presentation.response.*;
 import com.pabom.backend.careguideline.presentation.response.CareGuidelineImportResponse;
 import com.pabom.backend.careguideline.application.result.SpeciesCareStandardsResult;
 import com.pabom.backend.careguideline.application.result.PetRoutineResult;
+import com.pabom.backend.careguideline.application.result.TodayResult;
+import com.pabom.backend.careguideline.application.result.RoutineMutationResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -114,6 +116,16 @@ public final class OpenApiSchemas {
     public record PetRoutineListEnvelope(ResultType resultType, PetRoutineListSuccess success,
             @Schema(nullable = true) ErrorData error, MetaData meta) {}
     public record PetRoutineListSuccess(List<PetRoutineResult> data) {}
+
+    @Schema(name = "TodayApiResponse")
+    public record TodayEnvelope(ResultType resultType, TodaySuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record TodaySuccess(TodayResult data) {}
+
+    @Schema(name = "RoutineMutationApiResponse")
+    public record RoutineMutationEnvelope(ResultType resultType, RoutineMutationSuccess success,
+            @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record RoutineMutationSuccess(RoutineMutationResult data) {}
 
     @Schema(name = "ErrorApiResponse")
     public record ErrorEnvelope(

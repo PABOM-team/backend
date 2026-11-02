@@ -13,7 +13,9 @@ public enum CareGuidelineQueryErrorCode implements BaseErrorCode {
     GUIDELINE_VERSION_CONFLICT(HttpStatus.CONFLICT, "GUIDELINE_VERSION_CONFLICT",
             "동일 적용일의 게시 가이드라인이 여러 개입니다."),
     CARE_STANDARD_DATA_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "CARE_STANDARD_DATA_MISSING",
-            "가이드라인 관리 기준 데이터가 누락되었습니다.");
+            "가이드라인 관리 기준 데이터가 누락되었습니다."),
+    CARE_STANDARD_NOT_FOUND(HttpStatus.NOT_FOUND, "CARE_STANDARD_NOT_FOUND",
+            "현재 기준표에서 해당 관리 항목을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;

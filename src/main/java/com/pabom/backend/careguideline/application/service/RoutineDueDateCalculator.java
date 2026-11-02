@@ -41,11 +41,11 @@ public class RoutineDueDateCalculator {
         return toDateOnlyInstant(actualCompletionDate.plusDays(intervalDays));
     }
 
-    private LocalDate toServiceDate(Instant instant) {
+    public LocalDate toServiceDate(Instant instant) {
         return instant.atZone(SERVICE_ZONE).toLocalDate();
     }
 
-    private Instant toDateOnlyInstant(LocalDate date) {
+    public Instant toDateOnlyInstant(LocalDate date) {
         return date.atTime(DATE_ONLY_TIME).atZone(SERVICE_ZONE).toInstant();
     }
 }
