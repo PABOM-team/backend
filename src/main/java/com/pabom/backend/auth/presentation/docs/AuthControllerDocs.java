@@ -1,5 +1,7 @@
 package com.pabom.backend.auth.presentation.docs;
 
+import com.pabom.backend.auth.presentation.request.SocialTokenLoginRequest;
+import com.pabom.backend.config.OpenApiSchemas;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import com.pabom.backend.auth.presentation.response.TokenRefreshResponse;
@@ -100,6 +102,86 @@ public interface AuthControllerDocs {
             String state,
             HttpServletRequest request,
             HttpServletResponse response
+    );
+
+    @Operation(
+            summary = "네이티브 SDK 소셜 토큰 로그인",
+            description = """
+                    모바일 앱이 카카오 SDK / Google Sign-In SDK로 받은 토큰을 검증하고 로그인을 완료합니다. 인증 헤더는 필요하지 않습니다.
+                    - kakao: Body의 accessToken이 필수이며, 카카오 토큰 정보의 app_id가 서버 설정(KAKAO_APP_ID)과 일치해야 합니다.
+                    - google: Body의 idToken이 필수이며, Google 공개키 서명, iss(accounts.google.com), aud(서버의 Google Client ID), 만료 시간을 검증합니다.
+                    응답은 공통 응답 구조이며 success.data는 OAuth Callback 응답과 같습니다.
+                    PENDING_TERMS 사용자는 Signup Token을, ACTIVE 사용자는 Access Token과 HttpOnly 쿠키 pabom_rt를 받습니다.
+                    """,
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SocialTokenLoginRequest.class),
+                            examples = {
+                                    @ExampleObject(name = "kakao", value = TOKEN_LOGIN_KAKAO_REQUEST),
+                                    @ExampleObject(name = "google", value = TOKEN_LOGIN_GOOGLE_REQUEST)
+                            }
+                    )
+            )
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "소셜 토큰 로그인 성공. ACTIVE 사용자에게만 pabom_rt 쿠키를 발급합니다.",
+                    headers = @Header(
+                            name = "Set-Cookie",
+                            description = "ACTIVE 사용자만: pabom_rt=<refresh token>; Path=/api/v1/auth; Max-Age=1209600; HttpOnly; SameSite=Lax",
+                            schema = @Schema(type = "string")
+                    ),
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.OAuthLoginEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "SIGNUP", summary = "신규·약관 미동의 사용자", value = TOKEN_LOGIN_SIGNUP_SUCCESS),
+                                    @ExampleObject(name = "ACCESS", summary = "기존 ACTIVE 사용자", value = TOKEN_LOGIN_ACCESS_SUCCESS)
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "VALIDATION_FAILED: Body 누락 또는 provider에 필요한 토큰 누락·공백, UNSUPPORTED_OAUTH_PROVIDER: 지원하지 않는 provider",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "VALIDATION_FAILED", value = TOKEN_LOGIN_VALIDATION_FAILED),
+                                    @ExampleObject(name = "UNSUPPORTED_OAUTH_PROVIDER", value = TOKEN_LOGIN_UNSUPPORTED_PROVIDER)
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "INVALID_SOCIAL_TOKEN: 만료·위조되었거나 다른 앱(app_id/aud)에 발급된 소셜 토큰",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "INVALID_SOCIAL_TOKEN", value = TOKEN_LOGIN_INVALID_SOCIAL_TOKEN)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "502",
+                    description = "KAKAO_UNAVAILABLE, GOOGLE_UNAVAILABLE: OAuth Provider(토큰 정보·사용자 정보·공개키 조회) 통신 장애",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "KAKAO_UNAVAILABLE", value = TOKEN_LOGIN_KAKAO_UNAVAILABLE),
+                                    @ExampleObject(name = "GOOGLE_UNAVAILABLE", value = TOKEN_LOGIN_GOOGLE_UNAVAILABLE)
+                            }
+                    )
+            )
+    })
+    ResponseEntity<ApiResponseBody<OAuthLoginResponse>> loginWithToken(
+            @Parameter(description = "OAuth 제공자 (kakao, google)", example = "kakao", required = true) String provider,
+            SocialTokenLoginRequest request,
+            @Parameter(hidden = true) HttpServletRequest httpRequest,
+            @Parameter(hidden = true) HttpServletResponse response
     );
 
     @Operation(
@@ -282,6 +364,42 @@ public interface AuthControllerDocs {
                 "path": "/api/v1/auth/google/callback"
               }
             }
+            """;
+
+    String TOKEN_LOGIN_KAKAO_REQUEST = """
+            {"accessToken":"kakao-sdk-access-token"}
+            """;
+
+    String TOKEN_LOGIN_GOOGLE_REQUEST = """
+            {"idToken":"eyJhbGciOiJSUzI1NiIs..."}
+            """;
+
+    String TOKEN_LOGIN_SIGNUP_SUCCESS = """
+            {"resultType":"SUCCESS","success":{"data":{"signupToken":"eyJhbGciOi...","expiresIn":600,"isNewUser":true,"user":{"id":1,"nickname":"파봄 사용자1234","status":"PENDING_TERMS"}}},"error":null,"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/kakao/token"}}
+            """;
+
+    String TOKEN_LOGIN_ACCESS_SUCCESS = """
+            {"resultType":"SUCCESS","success":{"data":{"accessToken":"eyJhbGciOi...","expiresIn":1800,"isNewUser":false,"user":{"id":1,"nickname":"파봄","status":"ACTIVE"}}},"error":null,"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/google/token"}}
+            """;
+
+    String TOKEN_LOGIN_VALIDATION_FAILED = """
+            {"resultType":"FAIL","success":null,"error":{"code":"VALIDATION_FAILED","message":"요청값이 누락되었거나 올바르지 않습니다.","details":null},"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/kakao/token"}}
+            """;
+
+    String TOKEN_LOGIN_UNSUPPORTED_PROVIDER = """
+            {"resultType":"FAIL","success":null,"error":{"code":"UNSUPPORTED_OAUTH_PROVIDER","message":"지원하지 않는 OAuth 제공자입니다.","details":null},"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/naver/token"}}
+            """;
+
+    String TOKEN_LOGIN_INVALID_SOCIAL_TOKEN = """
+            {"resultType":"FAIL","success":null,"error":{"code":"INVALID_SOCIAL_TOKEN","message":"유효하지 않은 소셜 토큰입니다.","details":null},"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/kakao/token"}}
+            """;
+
+    String TOKEN_LOGIN_KAKAO_UNAVAILABLE = """
+            {"resultType":"FAIL","success":null,"error":{"code":"KAKAO_UNAVAILABLE","message":"카카오 OAuth 서버와 통신할 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/kakao/token"}}
+            """;
+
+    String TOKEN_LOGIN_GOOGLE_UNAVAILABLE = """
+            {"resultType":"FAIL","success":null,"error":{"code":"GOOGLE_UNAVAILABLE","message":"Google OAuth 서버와 통신할 수 없습니다.","details":null},"meta":{"timestamp":"2026-10-19T05:00:00","path":"/api/v1/auth/google/token"}}
             """;
 
     String RATE_LIMITED_EXAMPLE = """

@@ -7,4 +7,6 @@ public interface KakaoOAuthClientPort {
     String createAuthorizationUrl(String state);
 
     SocialUserInfo authenticate(String authorizationCode);
+
+    SocialUserInfo authenticateWithAccessToken(String accessToken);
 }

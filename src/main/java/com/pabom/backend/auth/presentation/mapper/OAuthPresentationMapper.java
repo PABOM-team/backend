@@ -1,8 +1,10 @@
 package com.pabom.backend.auth.presentation.mapper;
 
 import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginCompletionResult;
+import com.pabom.backend.auth.presentation.request.SocialTokenLoginRequest;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import org.springframework.stereotype.Component;
@@ -16,6 +18,10 @@ public class OAuthPresentationMapper {
             String actualState
     ) {
         return new OAuthCallbackCommand(authorizationCode, expectedState, actualState);
+    }
+
+    public OAuthTokenLoginCommand toCommand(SocialTokenLoginRequest request) {
+        return new OAuthTokenLoginCommand(request.accessToken(), request.idToken());
     }
 
     public OAuthAuthorizationUrlResponse toResponse(OAuthAuthorizationResult result) {

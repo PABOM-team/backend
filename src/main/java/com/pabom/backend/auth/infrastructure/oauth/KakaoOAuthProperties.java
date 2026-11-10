@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.kakao")
 public record KakaoOAuthProperties(
         String clientId,
+        String appId,
         String clientSecret,
         String redirectUri
 ) {

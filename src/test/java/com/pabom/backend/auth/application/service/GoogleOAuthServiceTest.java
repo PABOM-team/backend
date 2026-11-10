@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.port.GoogleOAuthClientPort;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
@@ -63,5 +65,27 @@ class GoogleOAuthServiceTest {
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode()
                         .getCode()).isEqualTo("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void returnsGoogleUserInfoForSdkToken() {
+        given(googleOAuthClient.authenticateWithIdToken("sdk-id-token"))
+                .willReturn(SocialUserInfo.google("123456", "파봄"));
+
+        OAuthLoginResult result = googleOAuthService.loginWithToken(new OAuthTokenLoginCommand(null, "sdk-id-token"));
+
+        assertThat(result.provider().name()).isEqualTo("GOOGLE");
+        assertThat(result.providerId()).isEqualTo("123456");
+        assertThat(result.nickname()).isEqualTo("파봄");
+    }
+
+    @Test
+    void rejectsTokenLoginWithoutIdToken() {
+        assertThatThrownBy(() -> googleOAuthService.loginWithToken(new OAuthTokenLoginCommand("sdk-id-token", null)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode()
+                        .getCode()).isEqualTo("VALIDATION_FAILED"));
+        verifyNoInteractions(googleOAuthClient);
     }
 }

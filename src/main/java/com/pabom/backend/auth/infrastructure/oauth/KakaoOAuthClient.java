@@ -4,6 +4,7 @@ import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.exception.InvalidSocialUserInfoException;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
+import com.pabom.backend.auth.infrastructure.oauth.dto.KakaoAccessTokenInfoResponse;
 import com.pabom.backend.auth.infrastructure.oauth.dto.KakaoTokenResponse;
 import com.pabom.backend.auth.infrastructure.oauth.dto.KakaoUserInfoResponse;
 import com.pabom.backend.global.error.BusinessException;
@@ -30,6 +31,7 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
     private static final String AUTHORIZATION_URL = "https://kauth.kakao.com/oauth/authorize";
     private static final String TOKEN_URL = "https://kauth.kakao.com/oauth/token";
     private static final String USER_INFO_URL = "https://kapi.kakao.com/v2/user/me";
+    private static final String ACCESS_TOKEN_INFO_URL = "https://kapi.kakao.com/v1/user/access_token_info";
     private static final String REQUIRED_SCOPES = "profile_nickname";
     private static final String CALLBACK_PATH = "/api/v1/auth/kakao/callback";
 
@@ -55,17 +57,61 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
         validateConfiguration();
         try {
             String accessToken = exchangeCode(authorizationCode);
-            KakaoUserInfoResponse userInfo = requestUserInfo(accessToken);
-            if (userInfo == null || userInfo.id() == null) {
-                throw new InvalidSocialUserInfoException("카카오 회원번호가 없습니다.");
-            }
-            return SocialUserInfo.kakao(
-                    userInfo.id().toString(),
-                    userInfo.nickname()
-            );
+            return fetchUserInfo(accessToken);
         } catch (BusinessException exception) {
             throw exception;
         } catch (RuntimeException exception) {
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
+        }
+    }
+
+    @Override
+    public SocialUserInfo authenticateWithAccessToken(String accessToken) {
+        validateAppIdConfiguration();
+        try {
+            KakaoAccessTokenInfoResponse tokenInfo = requestAccessTokenInfo(accessToken);
+            if (tokenInfo == null
+                    || tokenInfo.id() == null
+                    || tokenInfo.appId() == null
+                    || !properties.appId().trim().equals(tokenInfo.appId().toString())) {
+                throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN);
+            }
+            SocialUserInfo userInfo = fetchUserInfo(accessToken);
+            if (!tokenInfo.id().toString().equals(userInfo.providerId())) {
+                throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN);
+            }
+            return userInfo;
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
+        }
+    }
+
+    private SocialUserInfo fetchUserInfo(String accessToken) {
+        KakaoUserInfoResponse userInfo = requestUserInfo(accessToken);
+        if (userInfo == null || userInfo.id() == null) {
+            throw new InvalidSocialUserInfoException("카카오 회원번호가 없습니다.");
+        }
+        return SocialUserInfo.kakao(
+                userInfo.id().toString(),
+                userInfo.nickname()
+        );
+    }
+
+    private KakaoAccessTokenInfoResponse requestAccessTokenInfo(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        try {
+            return restTemplate.exchange(
+                    ACCESS_TOKEN_INFO_URL,
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    KakaoAccessTokenInfoResponse.class
+            ).getBody();
+        } catch (HttpClientErrorException exception) {
+            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN, exception);
+        } catch (RestClientResponseException | ResourceAccessException exception) {
             throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE, exception);
         }
     }
@@ -118,6 +164,12 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
         if (!StringUtils.hasText(properties.clientId())
                 || !StringUtils.hasText(properties.redirectUri())
                 || !properties.redirectUri().endsWith(CALLBACK_PATH)) {
+            throw new BusinessException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private void validateAppIdConfiguration() {
+        if (!StringUtils.hasText(properties.appId())) {
             throw new BusinessException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
         }
     }

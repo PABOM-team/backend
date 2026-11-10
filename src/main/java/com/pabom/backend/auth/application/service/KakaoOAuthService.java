@@ -1,6 +1,7 @@
 package com.pabom.backend.auth.application.service;
 
 import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
@@ -39,6 +40,20 @@ public class KakaoOAuthService implements OAuthService {
         }
 
         SocialUserInfo userInfo = kakaoOAuthClient.authenticate(command.authorizationCode());
+        return new OAuthLoginResult(
+                userInfo.provider(),
+                userInfo.providerId(),
+                userInfo.nickname()
+        );
+    }
+
+    @Override
+    public OAuthLoginResult loginWithToken(OAuthTokenLoginCommand command) {
+        if (!StringUtils.hasText(command.accessToken())) {
+            throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
+        }
+
+        SocialUserInfo userInfo = kakaoOAuthClient.authenticateWithAccessToken(command.accessToken());
         return new OAuthLoginResult(
                 userInfo.provider(),
                 userInfo.providerId(),

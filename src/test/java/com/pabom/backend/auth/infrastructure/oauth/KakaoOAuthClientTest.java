@@ -2,6 +2,7 @@ package com.pabom.backend.auth.infrastructure.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.ExpectedCount.never;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -35,6 +36,7 @@ class KakaoOAuthClientTest {
         server = MockRestServiceServer.createServer(restTemplate);
         KakaoOAuthProperties properties = new KakaoOAuthProperties(
                 "client-id",
+                "123456789",
                 "client-secret",
                 REDIRECT_URI
         );
@@ -104,6 +106,76 @@ class KakaoOAuthClientTest {
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThatThrownBy(() -> kakaoOAuthClient.authenticate("authorization-code"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("KAKAO_UNAVAILABLE"));
+    }
+
+    @Test
+    void authenticatesWithAccessTokenWhenAppIdMatches() {
+        server.expect(once(), requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer sdk-access-token"))
+                .andRespond(withSuccess(
+                        "{\"id\":123456,\"expires_in\":7199,\"app_id\":123456789}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(once(), requestTo("https://kapi.kakao.com/v2/user/me"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer sdk-access-token"))
+                .andRespond(withSuccess(
+                        """
+                        {
+                          "id": 123456,
+                          "kakao_account": {
+                            "profile": { "nickname": "파봄" }
+                          }
+                        }
+                        """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        SocialUserInfo userInfo = kakaoOAuthClient.authenticateWithAccessToken("sdk-access-token");
+
+        assertThat(userInfo.provider().name()).isEqualTo("KAKAO");
+        assertThat(userInfo.providerId()).isEqualTo("123456");
+        assertThat(userInfo.nickname()).isEqualTo("파봄");
+        server.verify();
+    }
+
+    @Test
+    void rejectsAccessTokenIssuedForAnotherApp() {
+        server.expect(once(), requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
+                .andRespond(withSuccess(
+                        "{\"id\":123456,\"expires_in\":7199,\"app_id\":999999}",
+                        MediaType.APPLICATION_JSON
+                ));
+        server.expect(never(), requestTo("https://kapi.kakao.com/v2/user/me"));
+
+        assertThatThrownBy(() -> kakaoOAuthClient.authenticateWithAccessToken("foreign-token"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("INVALID_SOCIAL_TOKEN"));
+        server.verify();
+    }
+
+    @Test
+    void mapsExpiredAccessTokenToInvalidSocialToken() {
+        server.expect(once(), requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThatThrownBy(() -> kakaoOAuthClient.authenticateWithAccessToken("expired-token"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("INVALID_SOCIAL_TOKEN"));
+    }
+
+    @Test
+    void mapsAccessTokenInfoServerErrorToUnavailable() {
+        server.expect(once(), requestTo("https://kapi.kakao.com/v1/user/access_token_info"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+
+        assertThatThrownBy(() -> kakaoOAuthClient.authenticateWithAccessToken("sdk-access-token"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("KAKAO_UNAVAILABLE"));
