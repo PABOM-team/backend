@@ -8,11 +8,21 @@ import com.pabom.backend.auth.infrastructure.oauth.dto.GoogleTokenResponse;
 import com.pabom.backend.auth.infrastructure.oauth.dto.GoogleUserInfoResponse;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.error.GlobalErrorCode;
-import lombok.RequiredArgsConstructor;
+import java.util.Collection;
+import java.util.Set;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -24,7 +34,6 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
-@RequiredArgsConstructor
 public class GoogleOAuthClient implements GoogleOAuthClientPort {
 
     private static final String AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -32,9 +41,21 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
     private static final String USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
     private static final String REQUIRED_SCOPES = "openid profile";
     private static final String CALLBACK_PATH = "/api/v1/auth/google/callback";
+    private static final String JWK_SET_URL = "https://www.googleapis.com/oauth2/v3/certs";
+    private static final Set<String> ALLOWED_ISSUERS = Set.of(
+            "accounts.google.com",
+            "https://accounts.google.com"
+    );
 
     private final RestTemplate restTemplate;
     private final GoogleOAuthProperties properties;
+    private final JwtDecoder idTokenDecoder;
+
+    public GoogleOAuthClient(RestTemplate restTemplate, GoogleOAuthProperties properties) {
+        this.restTemplate = restTemplate;
+        this.properties = properties;
+        this.idTokenDecoder = createIdTokenDecoder(restTemplate, properties);
+    }
 
     @Override
     public String createAuthorizationUrl(String state) {
@@ -65,6 +86,45 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
         } catch (RuntimeException exception) {
             throw new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE, exception);
         }
+    }
+
+    @Override
+    public SocialUserInfo authenticateWithIdToken(String idToken) {
+        if (!StringUtils.hasText(properties.clientId())) {
+            throw new BusinessException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
+        }
+        try {
+            Jwt jwt = idTokenDecoder.decode(idToken);
+            if (!StringUtils.hasText(jwt.getSubject())) {
+                throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN);
+            }
+            return SocialUserInfo.google(jwt.getSubject(), jwt.getClaimAsString("name"));
+        } catch (BadJwtException exception) {
+            throw new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN, exception);
+        } catch (JwtException exception) {
+            throw new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE, exception);
+        }
+    }
+
+    private static JwtDecoder createIdTokenDecoder(
+            RestTemplate restTemplate,
+            GoogleOAuthProperties properties
+    ) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(JWK_SET_URL)
+                .restOperations(restTemplate)
+                .build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                new JwtTimestampValidator(),
+                new JwtClaimValidator<Object>(
+                        JwtClaimNames.ISS,
+                        issuer -> issuer != null && ALLOWED_ISSUERS.contains(issuer.toString())
+                ),
+                new JwtClaimValidator<Collection<String>>(
+                        JwtClaimNames.AUD,
+                        audience -> audience != null && audience.contains(properties.clientId())
+                )
+        ));
+        return decoder;
     }
 
     private String exchangeCode(String authorizationCode) {

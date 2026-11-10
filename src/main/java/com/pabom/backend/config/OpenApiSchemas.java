@@ -1,5 +1,6 @@
 package com.pabom.backend.config;
 
+import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import com.pabom.backend.global.response.ResultType;
 import com.pabom.backend.pet.presentation.response.PetResponse;
 import com.pabom.backend.pet.presentation.response.PetListResponse;
@@ -138,6 +139,18 @@ public final class OpenApiSchemas {
     public record RoutinePostponeEnvelope(ResultType resultType, RoutinePostponeSuccess success,
             @Schema(nullable = true) ErrorData error, MetaData meta) {}
     public record RoutinePostponeSuccess(RoutinePostponeResult data) {}
+
+    @Schema(name = "OAuthLoginApiResponse")
+    public record OAuthLoginEnvelope(
+            @Schema(example = "SUCCESS") ResultType resultType,
+            OAuthLoginSuccess success,
+            @Schema(nullable = true) ErrorData error,
+            MetaData meta
+    ) {
+    }
+
+    public record OAuthLoginSuccess(OAuthLoginResponse data) {
+    }
 
     @Schema(name = "ErrorApiResponse")
     public record ErrorEnvelope(

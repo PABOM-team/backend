@@ -15,6 +15,7 @@ class SwaggerConfigTest {
         OpenAPI openApi = new OpenAPI().paths(new Paths()
                 .addPathItem("/api/v1/auth/logout", new PathItem())
                 .addPathItem("/api/v1/auth/refresh", new PathItem())
+                .addPathItem("/api/v1/auth/{provider}/token", new PathItem())
                 .addPathItem("/api/v1/auth/{provider}/callback", new PathItem())
                 .addPathItem("/api/v1/auth/{provider}/login-url", new PathItem())
                 .addPathItem("/api/v1/health", new PathItem()));
@@ -24,6 +25,7 @@ class SwaggerConfigTest {
         assertThat(new ArrayList<>(openApi.getPaths().keySet())).containsExactly(
                 "/api/v1/auth/{provider}/login-url",
                 "/api/v1/auth/{provider}/callback",
+                "/api/v1/auth/{provider}/token",
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/logout",
                 "/api/v1/health"

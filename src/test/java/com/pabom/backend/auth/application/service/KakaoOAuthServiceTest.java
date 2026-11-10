@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.pabom.backend.auth.application.command.OAuthCallbackCommand;
+import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
@@ -63,5 +65,27 @@ class KakaoOAuthServiceTest {
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode()
                         .getCode()).isEqualTo("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void returnsKakaoUserInfoForSdkToken() {
+        given(kakaoOAuthClient.authenticateWithAccessToken("sdk-access-token"))
+                .willReturn(SocialUserInfo.kakao("123456", "파봄"));
+
+        OAuthLoginResult result = kakaoOAuthService.loginWithToken(new OAuthTokenLoginCommand("sdk-access-token", null));
+
+        assertThat(result.provider().name()).isEqualTo("KAKAO");
+        assertThat(result.providerId()).isEqualTo("123456");
+        assertThat(result.nickname()).isEqualTo("파봄");
+    }
+
+    @Test
+    void rejectsTokenLoginWithoutAccessToken() {
+        assertThatThrownBy(() -> kakaoOAuthService.loginWithToken(new OAuthTokenLoginCommand(null, "sdk-access-token")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode()
+                        .getCode()).isEqualTo("VALIDATION_FAILED"));
+        verifyNoInteractions(kakaoOAuthClient);
     }
 }

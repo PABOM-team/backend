@@ -17,6 +17,7 @@ public class SwaggerConfig {
     private static final List<String> AUTH_PATH_ORDER = List.of(
             "/api/v1/auth/{provider}/login-url",
             "/api/v1/auth/{provider}/callback",
+            "/api/v1/auth/{provider}/token",
             "/api/v1/auth/refresh",
             "/api/v1/auth/logout"
     );

@@ -7,4 +7,6 @@ public interface GoogleOAuthClientPort {
     String createAuthorizationUrl(String state);
 
     SocialUserInfo authenticate(String authorizationCode);
+
+    SocialUserInfo authenticateWithIdToken(String idToken);
 }

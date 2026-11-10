@@ -2,6 +2,7 @@ package com.pabom.backend.auth.infrastructure.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.ExpectedCount.manyTimes;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -10,7 +11,18 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.pabom.backend.global.error.BusinessException;
+import java.time.Instant;
+import java.util.Date;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +37,9 @@ class GoogleOAuthClientTest {
 
     private static final String REDIRECT_URI =
             "https://dev.pabom.app/api/v1/auth/google/callback";
+    private static final String JWK_SET_URL = "https://www.googleapis.com/oauth2/v3/certs";
+    private static final RSAKey GOOGLE_SIGNING_KEY = generateKey("google-key");
+    private static final RSAKey FOREIGN_SIGNING_KEY = generateKey("google-key");
 
     private MockRestServiceServer server;
     private GoogleOAuthClient googleOAuthClient;
@@ -106,5 +121,114 @@ class GoogleOAuthClientTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("GOOGLE_UNAVAILABLE"));
+    }
+
+    @Test
+    void verifiesIdTokenAndMapsSameSubjectAndNameAsCodeFlow() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(GOOGLE_SIGNING_KEY, "https://accounts.google.com", "client-id",
+                Instant.now().plusSeconds(600));
+
+        SocialUserInfo userInfo = googleOAuthClient.authenticateWithIdToken(idToken);
+
+        assertThat(userInfo.provider().name()).isEqualTo("GOOGLE");
+        assertThat(userInfo.providerId()).isEqualTo("123456");
+        assertThat(userInfo.nickname()).isEqualTo("파봄");
+    }
+
+    @Test
+    void acceptsIssuerWithoutScheme() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(GOOGLE_SIGNING_KEY, "accounts.google.com", "client-id",
+                Instant.now().plusSeconds(600));
+
+        assertThat(googleOAuthClient.authenticateWithIdToken(idToken).providerId()).isEqualTo("123456");
+    }
+
+    @Test
+    void rejectsIdTokenIssuedForAnotherAudience() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(GOOGLE_SIGNING_KEY, "https://accounts.google.com", "other-client-id",
+                Instant.now().plusSeconds(600));
+
+        assertInvalidSocialToken(idToken);
+    }
+
+    @Test
+    void rejectsIdTokenFromAnotherIssuer() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(GOOGLE_SIGNING_KEY, "https://evil.example.com", "client-id",
+                Instant.now().plusSeconds(600));
+
+        assertInvalidSocialToken(idToken);
+    }
+
+    @Test
+    void rejectsExpiredIdToken() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(GOOGLE_SIGNING_KEY, "https://accounts.google.com", "client-id",
+                Instant.now().minusSeconds(600));
+
+        assertInvalidSocialToken(idToken);
+    }
+
+    @Test
+    void rejectsIdTokenSignedWithUnknownKey() throws JOSEException {
+        expectGoogleJwkSet();
+        String idToken = signIdToken(FOREIGN_SIGNING_KEY, "https://accounts.google.com", "client-id",
+                Instant.now().plusSeconds(600));
+
+        assertInvalidSocialToken(idToken);
+    }
+
+    @Test
+    void rejectsMalformedIdToken() {
+        assertInvalidSocialToken("not-a-jwt");
+    }
+
+    private void assertInvalidSocialToken(String idToken) {
+        assertThatThrownBy(() -> googleOAuthClient.authenticateWithIdToken(idToken))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("INVALID_SOCIAL_TOKEN"));
+    }
+
+    private void expectGoogleJwkSet() {
+        server.expect(manyTimes(), requestTo(JWK_SET_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        new JWKSet(GOOGLE_SIGNING_KEY.toPublicJWK()).toString(),
+                        MediaType.APPLICATION_JSON
+                ));
+    }
+
+    private static String signIdToken(
+            RSAKey signingKey,
+            String issuer,
+            String audience,
+            Instant expiresAt
+    ) throws JOSEException {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .issuer(issuer)
+                .audience(audience)
+                .subject("123456")
+                .claim("name", "파봄")
+                .issueTime(Date.from(expiresAt.minusSeconds(3600)))
+                .expirationTime(Date.from(expiresAt))
+                .build();
+        SignedJWT jwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signingKey.getKeyID()).build(),
+                claims
+        );
+        jwt.sign(new RSASSASigner(signingKey));
+        return jwt.serialize();
+    }
+
+    private static RSAKey generateKey(String keyId) {
+        try {
+            return new RSAKeyGenerator(2048).keyID(keyId).generate();
+        } catch (JOSEException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

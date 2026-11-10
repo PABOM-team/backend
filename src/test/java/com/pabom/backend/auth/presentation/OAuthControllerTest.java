@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +32,7 @@ import com.pabom.backend.user.domain.type.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
@@ -214,6 +216,126 @@ class OAuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("INVALID_SOCIAL_TOKEN"))
                 .andExpect(jsonPath("$.meta.path").value("/api/v1/auth/google/callback"));
+
+        verifyNoInteractions(loginCompletionService);
+    }
+
+    @Test
+    void kakaoTokenLoginReturnsEnvelopedCallbackResponseAndSetsRefreshCookieForActiveUser() throws Exception {
+        OAuthLoginResult socialLogin = new OAuthLoginResult(OAuthProvider.KAKAO, "123456", "파봄");
+        given(kakaoOAuthService.loginWithToken(argThat(command ->
+                "sdk-access-token".equals(command.accessToken())
+        ))).willReturn(socialLogin);
+        User user = mock(User.class);
+        given(user.getId()).willReturn(101L);
+        given(user.getNickname()).willReturn("파봄");
+        given(user.getStatus()).willReturn(UserStatus.ACTIVE);
+        given(loginCompletionService.complete(socialLogin)).willReturn(
+                OAuthLoginCompletionResult.access(
+                        "access-token",
+                        1800,
+                        "refresh-token",
+                        1209600,
+                        user
+                )
+        );
+
+        mockMvc.perform(post("/api/v1/auth/kakao/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accessToken\":\"sdk-access-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultType").value("SUCCESS"))
+                .andExpect(jsonPath("$.error").doesNotExist())
+                .andExpect(jsonPath("$.meta.path").value("/api/v1/auth/kakao/token"))
+                .andExpect(jsonPath("$.success.data.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.success.data.expiresIn").value(1800))
+                .andExpect(jsonPath("$.success.data.isNewUser").value(false))
+                .andExpect(jsonPath("$.success.data.user.id").value(101))
+                .andExpect(jsonPath("$.success.data.user.nickname").value("파봄"))
+                .andExpect(jsonPath("$.success.data.user.status").value("ACTIVE"))
+                .andExpect(header().stringValues(HttpHeaders.SET_COOKIE,
+                        org.hamcrest.Matchers.contains(org.hamcrest.Matchers.allOf(
+                                containsString("pabom_rt=refresh-token"),
+                                containsString("Max-Age=1209600"),
+                                containsString("Path=/api/v1/auth"),
+                                containsString("HttpOnly")
+                        ))));
+    }
+
+    @Test
+    void googleTokenLoginReturnsSignupResponseWithoutCookies() throws Exception {
+        OAuthLoginResult socialLogin = new OAuthLoginResult(OAuthProvider.GOOGLE, "123456", "파봄");
+        given(googleOAuthService.loginWithToken(argThat(command ->
+                "sdk-id-token".equals(command.idToken())
+        ))).willReturn(socialLogin);
+        User user = mock(User.class);
+        given(user.getId()).willReturn(101L);
+        given(user.getNickname()).willReturn("파봄");
+        given(user.getStatus()).willReturn(UserStatus.PENDING_TERMS);
+        given(loginCompletionService.complete(socialLogin)).willReturn(
+                OAuthLoginCompletionResult.signup("signup-token", 600, true, user)
+        );
+
+        mockMvc.perform(post("/api/v1/auth/google/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"sdk-id-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultType").value("SUCCESS"))
+                .andExpect(jsonPath("$.meta.path").value("/api/v1/auth/google/token"))
+                .andExpect(jsonPath("$.success.data.signupToken").value("signup-token"))
+                .andExpect(jsonPath("$.success.data.expiresIn").value(600))
+                .andExpect(jsonPath("$.success.data.isNewUser").value(true))
+                .andExpect(jsonPath("$.success.data.user.status").value("PENDING_TERMS"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void tokenLoginReturnsUnauthorizedForInvalidSocialToken() throws Exception {
+        given(kakaoOAuthService.loginWithToken(argThat(command -> true)))
+                .willThrow(new BusinessException(AuthErrorCode.INVALID_SOCIAL_TOKEN));
+
+        mockMvc.perform(post("/api/v1/auth/kakao/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accessToken\":\"foreign-token\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.resultType").value("FAIL"))
+                .andExpect(jsonPath("$.error.code").value("INVALID_SOCIAL_TOKEN"))
+                .andExpect(jsonPath("$.meta.path").value("/api/v1/auth/kakao/token"));
+
+        verifyNoInteractions(loginCompletionService);
+    }
+
+    @Test
+    void tokenLoginReturnsBadRequestWithoutBody() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/google/token")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+
+        verifyNoInteractions(loginCompletionService);
+    }
+
+    @Test
+    void tokenLoginReturnsBadRequestForUnsupportedProvider() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/naver/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accessToken\":\"token\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_OAUTH_PROVIDER"));
+
+        verifyNoInteractions(loginCompletionService);
+    }
+
+    @Test
+    void tokenLoginReturnsBadGatewayWhenProviderIsUnavailable() throws Exception {
+        given(googleOAuthService.loginWithToken(argThat(command -> true)))
+                .willThrow(new BusinessException(AuthErrorCode.GOOGLE_UNAVAILABLE));
+
+        mockMvc.perform(post("/api/v1/auth/google/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idToken\":\"sdk-id-token\"}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error.code").value("GOOGLE_UNAVAILABLE"));
 
         verifyNoInteractions(loginCompletionService);
     }

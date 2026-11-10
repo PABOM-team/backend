@@ -13,6 +13,7 @@ import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
 import com.pabom.backend.auth.presentation.docs.AuthControllerDocs;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
+import com.pabom.backend.auth.presentation.request.SocialTokenLoginRequest;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import com.pabom.backend.auth.presentation.response.TokenRefreshResponse;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -106,6 +108,27 @@ public class AuthController implements AuthControllerDocs {
             );
         }
         return ResponseEntity.ok(mapper.toResponse(result));
+    }
+
+    @Override
+    @PostMapping("/{provider}/token")
+    public ResponseEntity<ApiResponseBody<OAuthLoginResponse>> loginWithToken(
+            @PathVariable String provider,
+            @RequestBody SocialTokenLoginRequest request,
+            @Parameter(hidden = true) HttpServletRequest httpRequest,
+            @Parameter(hidden = true) HttpServletResponse response
+    ) {
+        OAuthService service = serviceResolver.resolve(provider);
+        OAuthLoginResult socialLogin = service.loginWithToken(mapper.toCommand(request));
+        OAuthLoginCompletionResult result = loginCompletionService.complete(socialLogin);
+        if (result.refreshToken() != null) {
+            refreshTokenCookieManager.add(
+                    response,
+                    result.refreshToken(),
+                    result.refreshExpiresIn()
+            );
+        }
+        return ResponseEntity.ok(ApiResponseBody.success(mapper.toResponse(result), httpRequest));
     }
 
     @Override
