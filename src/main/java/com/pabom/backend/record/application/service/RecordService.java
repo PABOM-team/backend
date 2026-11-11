@@ -286,7 +286,8 @@ public class RecordService {
         if (routine == null) return null;
         CareRecord latest = records.findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
                 userId, routine.getId()).orElse(null);
-        Instant next = latest == null || routine.getIntervalDays() == null ? null
+        Instant next = latest == null ? baseDueAt(routine)
+                : routine.getIntervalDays() == null ? null
                 : dueDates.nextDueAfterCompletion(dueDates.toServiceDate(latest.getOccurredAt()), routine.getIntervalDays());
         LocalDate lastDoneOn = records
                 .findFirstByUserIdAndRoutineIdAndRecordTypeAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
@@ -294,6 +295,11 @@ public class RecordService {
                 .map(CareRecord::getOccurredAt).map(dueDates::toServiceDate).orElse(null);
         routine.recalculateAfterRecordChange(lastDoneOn, next, now); routines.save(routine);
         return new RoutineUpdatedResponse(routine.getId(), atKst(next));
+    }
+    // 남은 기록이 없으면 첫 기록 전 예정일(시작일)로 되돌린다. 시작일은 루틴 생성·수정·초기화 때 첫 예정일과 같게 저장된다.
+    private Instant baseDueAt(Routine routine) {
+        return routine.isActive() && routine.getStartDate() != null
+                ? dueDates.toDateOnlyInstant(routine.getStartDate()) : null;
     }
     private RoutineUpdatedResponse currentRoutine(Routine routine) {
         return routine == null ? null : new RoutineUpdatedResponse(routine.getId(), atKst(routine.getNextDueAt()));

@@ -91,8 +91,8 @@ public class TodayQueryService {
             if (item == null) continue;
             String code = itemContext.code(routine, item);
             CareRecord latestRecord = latestRecordByRoutine.get(routine.getId());
-            LocalDate nextDueDate = routine.getNextDueAt() == null ? null
-                    : dueDates.toServiceDate(routine.getNextDueAt());
+            LocalDate nextDueDate = routine.getNextDueAt() != null ? dueDates.toServiceDate(routine.getNextDueAt())
+                    : latestRecord == null ? routine.getStartDate() : null;
             if (latestRecord != null) {
                 LocalDate handledDate = dueDates.toServiceDate(latestRecord.getOccurredAt());
                 if (nextDueDate == null || !nextDueDate.isAfter(handledDate)) {
