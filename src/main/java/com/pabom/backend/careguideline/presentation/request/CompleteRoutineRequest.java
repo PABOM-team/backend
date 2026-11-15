@@ -14,7 +14,7 @@ public record CompleteRoutineRequest(
         @NotNull UUID clientRequestId,
         @Schema(nullable = true) OffsetDateTime occurredAt,
         @Schema(nullable = true, defaultValue = "EXACT") TimePrecision timePrecision,
-        @Schema(nullable = true) FeedingOutcome outcome,
+        @Schema(nullable = true, description = "크레스티드 게코 DIET: EATING_TRACE_FOUND, EATING_TRACE_NOT_FOUND, NOT_OBSERVED. 그 외 급여: ATE_ALL, ATE_PART, REFUSED, NOT_OBSERVED", allowableValues = {"ATE_ALL", "ATE_PART", "REFUSED", "NOT_OBSERVED", "EATING_TRACE_FOUND", "EATING_TRACE_NOT_FOUND"}) FeedingOutcome outcome,
         @Schema(nullable = true) BigDecimal valueNum,
         @Schema(nullable = true) JsonNode detail,
         @Size(max = 500) @Schema(nullable = true) String memo

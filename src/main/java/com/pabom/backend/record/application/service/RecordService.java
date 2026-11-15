@@ -56,6 +56,7 @@ public class RecordService {
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final RoutineDueDateCalculator dueDates;
+    private final FeedingOutcomePolicy feedingOutcomes;
 
     @Transactional
     public RecordMutationResponse create(Long userId, CreateRecordRequest request) {
@@ -74,8 +75,10 @@ public class RecordService {
         Instant occurredAt = normalize(request.occurredAt(), precision);
         validateOccurredAt(occurredAt, precision);
         validateValues(item, request.outcome(), request.valueNum(), request.detail(), request.memo());
-        validatePhoto(userId, request.photoFileId());
         Routine routine = routines.findByPetIdAndCareItemIdAndActiveTrue(pet.getId(), item.getId()).orElse(null);
+        feedingOutcomes.validate(pet, item,
+                routine == null ? null : routine.getGuidelineVersionId(), request.outcome());
+        validatePhoto(userId, request.photoFileId());
         Instant now = clock.instant();
         CareRecord saved = records.saveAndFlush(CareRecord.manual(userId, pet.getId(), item.getId(),
                 routine == null ? null : routine.getId(), request.clientRequestId().toString(), hash,
@@ -116,7 +119,11 @@ public class RecordService {
         JsonNode detail = request.has("detail") ? request.getDetail() : parse(record.getDetailJson());
         String memo = request.has("memo") ? clean(request.getMemo()) : record.getMemo();
         Long photoId = request.has("photoFileId") ? request.getPhotoFileId() : record.getPhotoFileId();
-        validateOccurredAt(occurredAt, precision); validateValues(item, outcome, value, detail, memo); validatePhoto(userId, photoId);
+        validateOccurredAt(occurredAt, precision); validateValues(item, outcome, value, detail, memo);
+        if (request.has("outcome")) feedingOutcomes.validate(
+                pets.findById(record.getPetId()).orElseThrow(() -> error(RecordErrorCode.RECORD_NOT_FOUND)),
+                item, record.getGuidelineVersionId(), outcome);
+        validatePhoto(userId, photoId);
 
         ObjectNode before = snapshot(record);
         boolean firstResult = record.getOutcome() == null && outcome != null;
@@ -340,7 +347,9 @@ public class RecordService {
     private String summary(CareRecord record, CareItem item) {
         if (record.getOutcome() != null) return switch (record.getOutcome()) {
             case ATE_ALL -> "모두 먹음"; case ATE_PART -> "일부 먹음";
-            case REFUSED -> "먹지 않음"; case NOT_OBSERVED -> "확인하지 못함";
+            case REFUSED -> "먹지 않음"; case NOT_OBSERVED -> "관찰 못함";
+            case EATING_TRACE_FOUND -> "먹은 흔적 있음";
+            case EATING_TRACE_NOT_FOUND -> "먹은 흔적 없음";
         };
         if (record.getValueNum() != null) return record.getValueNum().stripTrailingZeros().toPlainString()
                 + (item.getUnit() == null ? "" : item.getUnit());

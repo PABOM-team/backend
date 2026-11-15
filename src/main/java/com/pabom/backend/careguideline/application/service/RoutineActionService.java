@@ -16,6 +16,7 @@ import com.pabom.backend.pet.domain.type.PetStatus;
 import com.pabom.backend.record.domain.entity.*;
 import com.pabom.backend.record.domain.error.*;
 import com.pabom.backend.record.domain.type.*;
+import com.pabom.backend.record.application.service.FeedingOutcomePolicy;
 import com.pabom.backend.record.infrastructure.persistence.*;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -46,6 +47,7 @@ public class RoutineActionService {
     private final RoutineDueDateCalculator dueDates;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final FeedingOutcomePolicy feedingOutcomes;
 
     @Transactional
     public RoutineActionResult complete(Long userId, Long routineId, CompleteRoutineRequest request) {
@@ -60,6 +62,8 @@ public class RoutineActionService {
         Instant occurredAt = normalize(request.occurredAt(), precision);
         validateOccurredAt(occurredAt, precision);
         validateValues(context.item(), request.outcome(), request.valueNum(), request.detail(), request.memo());
+        feedingOutcomes.validate(context.pet(), context.item(), context.routine().getGuidelineVersionId(),
+                request.outcome());
         LocalDate actionDate = dueDates.toServiceDate(occurredAt);
         rejectDuplicate(routineId, actionDate);
 

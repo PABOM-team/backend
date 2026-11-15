@@ -25,7 +25,7 @@ public class UpdateRecordRequest {
     public void setOccurredAt(OffsetDateTime value) { occurredAt = value; present.add("occurredAt"); }
     @Schema(nullable = true, allowableValues = {"EXACT", "DATE_ONLY"}) public TimePrecision getTimePrecision() { return timePrecision; }
     public void setTimePrecision(TimePrecision value) { timePrecision = value; present.add("timePrecision"); }
-    @Schema(nullable = true, allowableValues = {"ATE_ALL", "ATE_PART", "REFUSED", "NOT_OBSERVED"}) public FeedingOutcome getOutcome() { return outcome; }
+    @Schema(nullable = true, description = "크레스티드 게코 DIET: EATING_TRACE_FOUND, EATING_TRACE_NOT_FOUND, NOT_OBSERVED. 그 외 급여: ATE_ALL, ATE_PART, REFUSED, NOT_OBSERVED", allowableValues = {"ATE_ALL", "ATE_PART", "REFUSED", "NOT_OBSERVED", "EATING_TRACE_FOUND", "EATING_TRACE_NOT_FOUND"}) public FeedingOutcome getOutcome() { return outcome; }
     public void setOutcome(FeedingOutcome value) { outcome = value; present.add("outcome"); }
     @Schema(nullable = true) public BigDecimal getValueNum() { return valueNum; }
     public void setValueNum(BigDecimal value) { valueNum = value; present.add("valueNum"); }

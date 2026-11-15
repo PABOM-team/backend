@@ -28,6 +28,9 @@ class RoutineSwaggerTest {
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/skip'].post.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/postpone'].post.responses['200']").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.security[0].Authorization").isArray())
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.requestBody.content['application/json'].examples['크레스티드 게코 DIET 급여 완료'].value.outcome").value("EATING_TRACE_FOUND"))
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.responses['200'].content['application/json'].examples['크레스티드 게코 DIET 급여 완료'].value.success.data.record.outcome").value("EATING_TRACE_FOUND"))
+                .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/complete'].post.responses['422'].content['application/json'].examples.OUTCOME_NOT_ALLOWED.value.error.code").value("OUTCOME_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.paths['/api/v1/today'].get.security[0].Authorization").isArray())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}'].patch.requestBody.content['application/json'].schema['$ref']").exists())
                 .andExpect(jsonPath("$.components.schemas.UpdateRoutineRequest.properties.reason.enum",
