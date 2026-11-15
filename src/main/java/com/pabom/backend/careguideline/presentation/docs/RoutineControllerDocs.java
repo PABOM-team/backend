@@ -59,14 +59,14 @@ public interface RoutineControllerDocs {
     ResponseEntity<ApiResponseBody<RoutineMutationResult>> reset(Long routineId, AuthUser authUser,
             HttpServletRequest request);
 
-    @Operation(summary = "루틴 완료", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @Operation(summary = "루틴 완료", description = "크레스티드 게코의 DIET 급여는 EATING_TRACE_FOUND, EATING_TRACE_NOT_FOUND, NOT_OBSERVED만 허용합니다. 레오파드 게코, 볼파이톤 및 크레스티드 게코의 INSECT 급여는 기존 결과값을 사용합니다.", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION), requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(schema = @Schema(implementation = CompleteRoutineRequest.class), examples = @ExampleObject(name = "크레스티드 게코 DIET 급여 완료", value = COMPLETE_REQUEST))))
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "완료 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutineActionEnvelope.class))),
+            @ApiResponse(responseCode = "200", description = "완료 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutineActionEnvelope.class), examples = @ExampleObject(name = "크레스티드 게코 DIET 급여 완료", value = COMPLETE_SUCCESS))),
             @ApiResponse(responseCode = "400", description = "요청 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = VALIDATION_FAILED))),
             @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = AUTH_REQUIRED))),
             @ApiResponse(responseCode = "404", description = "루틴 없음", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(value = ROUTINE_NOT_FOUND))),
-            @ApiResponse(responseCode = "409", description = "중복 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
-            @ApiResponse(responseCode = "422", description = "결과 또는 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class)))
+            @ApiResponse(responseCode = "409", description = "중복 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = {@ExampleObject(name = "CLIENT_REQUEST_ID_REUSED", value = CLIENT_REQUEST_ID_REUSED), @ExampleObject(name = "ROUTINE_NOT_ACTIVE", value = ROUTINE_NOT_ACTIVE), @ExampleObject(name = "ROUTINE_ACTION_DUPLICATE", value = ROUTINE_ACTION_DUPLICATE)})),
+            @ApiResponse(responseCode = "422", description = "결과 또는 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(name = "OUTCOME_NOT_ALLOWED", value = COMPLETE_OUTCOME_NOT_ALLOWED)))
     })
     ResponseEntity<ApiResponseBody<RoutineActionResult>> complete(Long routineId, AuthUser authUser,
             CompleteRoutineRequest body, HttpServletRequest request);

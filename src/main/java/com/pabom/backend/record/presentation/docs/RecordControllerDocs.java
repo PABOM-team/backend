@@ -49,7 +49,7 @@ public interface RecordControllerDocs {
 
     @Operation(summary="기록 상세 및 정정 이력 조회", security=@SecurityRequirement(name=SwaggerConfig.AUTHORIZATION))
     @ApiResponses({
-        @ApiResponse(responseCode="200", description="조회 성공", content=@Content(schema=@Schema(implementation=OpenApiSchemas.RecordDetailEnvelope.class), examples=@ExampleObject(value=DETAIL_SUCCESS))),
+        @ApiResponse(responseCode="200", description="조회 성공", content=@Content(schema=@Schema(implementation=OpenApiSchemas.RecordDetailEnvelope.class), examples=@ExampleObject(name="기록 상세 및 정정 이력", value=DETAIL_SUCCESS))),
         @ApiResponse(responseCode="401", description="인증 오류", content=@Content(schema=@Schema(implementation=OpenApiSchemas.ErrorEnvelope.class), examples={@ExampleObject(name="AUTH_REQUIRED",value=AUTH_REQUIRED),@ExampleObject(name="TOKEN_EXPIRED",value=TOKEN_EXPIRED),@ExampleObject(name="TOKEN_INVALID",value=TOKEN_INVALID),@ExampleObject(name="USER_WITHDRAWN",value=USER_WITHDRAWN)})),
         @ApiResponse(responseCode="404", description="기록 없음 또는 타 사용자 기록", content=@Content(schema=@Schema(implementation=OpenApiSchemas.ErrorEnvelope.class), examples=@ExampleObject(name="RECORD_NOT_FOUND",value=RECORD_NOT_FOUND)))
     })

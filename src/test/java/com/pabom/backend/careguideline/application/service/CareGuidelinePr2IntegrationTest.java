@@ -31,6 +31,10 @@ import com.pabom.backend.record.infrastructure.persistence.RoutineJpaRepository;
 import com.pabom.backend.careguideline.presentation.request.UpdateRoutineRequest;
 import com.pabom.backend.global.error.BaseErrorCode;
 import com.pabom.backend.record.domain.error.RoutineErrorCode;
+import com.pabom.backend.record.domain.error.RecordErrorCode;
+import com.pabom.backend.record.application.service.RecordService;
+import com.pabom.backend.record.presentation.request.CreateRecordRequest;
+import com.pabom.backend.record.presentation.request.UpdateRecordRequest;
 import com.pabom.backend.species.domain.entity.LifeStage;
 import com.pabom.backend.species.domain.entity.Species;
 import com.pabom.backend.species.infrastructure.persistence.LifeStageJpaRepository;
@@ -82,6 +86,8 @@ class CareGuidelinePr2IntegrationTest {
     @Autowired TodayQueryService todayQueryService;
     @Autowired RoutineCommandService routineCommandService;
     @Autowired CareRecordJpaRepository records;
+    @Autowired RecordService recordService;
+    @Autowired RoutineActionService routineActionService;
 
     User owner;
     User other;
@@ -187,6 +193,115 @@ class CareGuidelinePr2IntegrationTest {
         assertThat(ballPythonRoutines).containsKey("MIST")
                 .doesNotContainKeys("FEED_INSECT", "HUMID_HIDE", "MULTIVITAMIN");
         assertThat(ballPythonRoutines.get("MIST").getNextDueAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void appliesCrestedDietOutcomesToCreateUpdateListDetailAndHistory() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+
+        var found = recordService.create(owner.getId(), recordRequest(
+                pet.id(), "FEED", FeedingOutcome.EATING_TRACE_FOUND));
+        recordService.create(owner.getId(), recordRequest(
+                pet.id(), "FEED", FeedingOutcome.EATING_TRACE_NOT_FOUND));
+        recordService.create(owner.getId(), recordRequest(
+                pet.id(), "FEED", FeedingOutcome.NOT_OBSERVED));
+
+        assertThat(recordService.list(owner.getId(), pet.id(), "FEED", null,
+                null, null, false, null, 20).items())
+                .extracting(item -> item.outcome(), item -> item.detailSummary())
+                .contains(tuple(FeedingOutcome.EATING_TRACE_FOUND, "먹은 흔적 있음"),
+                        tuple(FeedingOutcome.EATING_TRACE_NOT_FOUND, "먹은 흔적 없음"),
+                        tuple(FeedingOutcome.NOT_OBSERVED, "관찰 못함"));
+
+        UpdateRecordRequest update = new UpdateRecordRequest();
+        update.setRevisionNo(1);
+        update.setOutcome(FeedingOutcome.EATING_TRACE_NOT_FOUND);
+        var updated = recordService.update(owner.getId(), found.record().id(), update);
+        assertThat(updated.record().outcome()).isEqualTo(FeedingOutcome.EATING_TRACE_NOT_FOUND);
+        assertThat(recordService.get(owner.getId(), found.record().id()).revisions())
+                .singleElement().satisfies(revision -> {
+                    assertThat(revision.changedFields()).contains("outcome");
+                    assertThat(revision.before().get("outcome").asText()).isEqualTo("EATING_TRACE_FOUND");
+                    assertThat(revision.after().get("outcome").asText()).isEqualTo("EATING_TRACE_NOT_FOUND");
+                });
+
+        assertError(() -> recordService.create(owner.getId(),
+                recordRequest(pet.id(), "FEED", FeedingOutcome.ATE_ALL)),
+                RecordErrorCode.OUTCOME_NOT_ALLOWED);
+    }
+
+    @Test
+    void keepsLegacyOutcomesForCrestedInsectLeopardAndBallPython() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        Species ballPython = species.findByCode("BALL_PYTHON").orElseThrow();
+        PetResult crestedPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        PetResult leopardPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), leopard.getId(), null, Certainty.UNKNOWN));
+        PetResult ballPythonPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), ballPython.getId(), null, Certainty.UNKNOWN));
+
+        assertThat(recordService.create(owner.getId(), recordRequest(
+                crestedPet.id(), "FEED_INSECT", FeedingOutcome.ATE_PART)).record().outcome())
+                .isEqualTo(FeedingOutcome.ATE_PART);
+        assertThat(recordService.create(owner.getId(), recordRequest(
+                leopardPet.id(), "FEED", FeedingOutcome.ATE_ALL)).record().outcome())
+                .isEqualTo(FeedingOutcome.ATE_ALL);
+        assertThat(recordService.create(owner.getId(), recordRequest(
+                ballPythonPet.id(), "FEED", FeedingOutcome.REFUSED)).record().outcome())
+                .isEqualTo(FeedingOutcome.REFUSED);
+
+        assertError(() -> recordService.create(owner.getId(), recordRequest(
+                leopardPet.id(), "FEED", FeedingOutcome.EATING_TRACE_FOUND)),
+                RecordErrorCode.OUTCOME_NOT_ALLOWED);
+        assertError(() -> recordService.create(owner.getId(), recordRequest(
+                ballPythonPet.id(), "FEED", FeedingOutcome.EATING_TRACE_NOT_FOUND)),
+                RecordErrorCode.OUTCOME_NOT_ALLOWED);
+    }
+
+    @Test
+    void appliesCrestedDietOutcomeToRoutineCompletion() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        Routine feed = routinesByCode(pet.id()).get("FEED");
+
+        var completed = routineActionService.complete(owner.getId(), feed.getId(),
+                new com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest(
+                        UUID.randomUUID(), OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                        TimePrecision.EXACT, FeedingOutcome.EATING_TRACE_FOUND,
+                        null, null, null));
+
+        assertThat(completed.record().outcome()).isEqualTo(FeedingOutcome.EATING_TRACE_FOUND);
+
+        PetResult rejectedPet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        Routine rejectedFeed = routinesByCode(rejectedPet.id()).get("FEED");
+        assertError(() -> routineActionService.complete(owner.getId(), rejectedFeed.getId(),
+                new com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest(
+                        UUID.randomUUID(), OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                        TimePrecision.EXACT, FeedingOutcome.ATE_ALL, null, null, null)),
+                RecordErrorCode.OUTCOME_NOT_ALLOWED);
+    }
+
+    @Test
+    void readsAndCorrectsNonOutcomeFieldsOfLegacyCrestedDietRecord() {
+        Species crested = species.findByCode("CRESTED").orElseThrow();
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), crested.getId(), null, Certainty.UNKNOWN));
+        Routine feed = routinesByCode(pet.id()).get("FEED");
+        CareRecord legacy = saveRecord(pet.id(), feed, NOW.minusSeconds(60),
+                RecordType.DONE, FeedingOutcome.ATE_ALL);
+
+        assertThat(recordService.get(owner.getId(), legacy.getId()).record().outcome())
+                .isEqualTo(FeedingOutcome.ATE_ALL);
+        UpdateRecordRequest update = new UpdateRecordRequest();
+        update.setRevisionNo(1);
+        update.setMemo("과거 결과값 유지");
+        assertThat(recordService.update(owner.getId(), legacy.getId(), update).record().outcome())
+                .isEqualTo(FeedingOutcome.ATE_ALL);
     }
 
     @Test
@@ -377,6 +492,18 @@ class CareGuidelinePr2IntegrationTest {
 
     private CreatePetCommand command(UUID requestId, Long stageId, Certainty certainty) {
         return command(requestId, leopard.getId(), stageId, certainty);
+    }
+
+    private CreateRecordRequest recordRequest(Long petId, String itemCode, FeedingOutcome outcome) {
+        return new CreateRecordRequest(UUID.randomUUID(), petId, itemCode,
+                OffsetDateTime.ofInstant(NOW.minusSeconds(60), ZoneOffset.UTC),
+                TimePrecision.EXACT, outcome, null, null, null, null, null);
+    }
+
+    private void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action,
+            BaseErrorCode errorCode) {
+        assertThatThrownBy(action).isInstanceOfSatisfying(BusinessException.class,
+                exception -> assertThat(exception.errorCode()).isEqualTo(errorCode));
     }
 
     private CreatePetCommand command(UUID requestId, Long speciesId, Long stageId, Certainty certainty) {
