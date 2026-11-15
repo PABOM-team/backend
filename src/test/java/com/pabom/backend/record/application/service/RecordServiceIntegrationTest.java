@@ -5,6 +5,9 @@ import static org.mockito.BDDMockito.given;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
+import com.pabom.backend.careguideline.application.result.*;
+import com.pabom.backend.careguideline.application.service.*;
+import com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest;
 import com.pabom.backend.event.infrastructure.persistence.LoginEventJpaRepository;
 import com.pabom.backend.file.application.port.FileStoragePort;
 import com.pabom.backend.file.domain.entity.File;
@@ -44,6 +47,7 @@ class RecordServiceIntegrationTest {
     @Autowired ObjectMapper mapper; @Autowired JdbcTemplate jdbc; @Autowired Clock clock;
     @Autowired EntityManager entityManager;
     @Autowired PetCommandService petCommands;
+    @Autowired RoutineActionService routineActions; @Autowired TodayQueryService todayService;
     @MockitoBean FileStoragePort storage;
     private User owner; private User other; private Pet pet;
 
@@ -105,7 +109,9 @@ class RecordServiceIntegrationTest {
 
     @Test void linksExistingRoutineRecalculatesDueDateAndReturnsPhotoUrl() {
         CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
-        Routine routine=routines.saveAndFlush(Routine.active(pet.getId(),feeding.getId(),7,clock.instant()));
+        LocalDate startDate=LocalDate.now(clock.withZone(ZoneId.of("Asia/Seoul"))).minusDays(1);
+        Instant startDueAt=startDate.atTime(12, 0).atZone(ZoneId.of("Asia/Seoul")).toInstant();
+        Routine routine=routines.saveAndFlush(Routine.guideline(pet.getId(),feeding.getId(),7,true,null,startDate,startDueAt,clock.instant()));
         File photo=files.saveAndFlush(File.temporary(owner.getId(),FilePurpose.RECORD_PHOTO,"image/png",1,1,1,"record/photo.png",clock.instant()));
         given(storage.createDownloadUrl(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).willReturn("https://example.test/photo");
         CreateRecordRequest request=new CreateRecordRequest(UUID.randomUUID(),pet.getId(),"FEEDING",OffsetDateTime.now(clock).minusHours(1),TimePrecision.EXACT,FeedingOutcome.ATE_ALL,null,null,null,photo.getId(),100);
@@ -114,7 +120,69 @@ class RecordServiceIntegrationTest {
         assertThat(result.routineUpdated().nextDueAt()).isEqualTo(result.record().occurredAt().toLocalDate()
                 .plusDays(7).atTime(12, 0).atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime());
         assertThat(result.record().photo().url()).isEqualTo("https://example.test/photo");
-        service.delete(owner.getId(),result.record().id()); assertThat(routines.findById(routine.getId()).orElseThrow().getNextDueAt()).isNull();
+        DeleteRecordResponse deleted=service.delete(owner.getId(),result.record().id());
+        assertThat(deleted.routineUpdated().nextDueAt()).isEqualTo(startDueAt.atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime());
+        Routine stored=routines.findById(routine.getId()).orElseThrow();
+        assertThat(stored.getNextDueAt()).isEqualTo(startDueAt); assertThat(stored.getLastDoneOn()).isNull();
+        RecordMutationResponse restored=service.restore(owner.getId(),result.record().id());
+        assertThat(restored.routineUpdated().nextDueAt()).isEqualTo(result.routineUpdated().nextDueAt());
+    }
+
+    @Test void cancellingOnlyCompletionBringsTodayTaskBack() {
+        CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        ZoneId kst=ZoneId.of("Asia/Seoul"); LocalDate today=LocalDate.now(clock.withZone(kst));
+        Routine routine=routines.saveAndFlush(Routine.guideline(pet.getId(),feeding.getId(),3,true,null,today.minusDays(2),
+                today.minusDays(2).atTime(12, 0).atZone(kst).toInstant(),clock.instant()));
+        assertThat(todayTask(routine, today).status()).isEqualTo(TodayTaskStatus.OVERDUE);
+
+        RoutineActionResult completed=routineActions.complete(owner.getId(),routine.getId(),new CompleteRoutineRequest(UUID.randomUUID(),
+                OffsetDateTime.now(clock).minusMinutes(1),TimePrecision.EXACT,FeedingOutcome.ATE_ALL,null,null,null));
+        assertThat(todayTask(routine, today).status()).isEqualTo(TodayTaskStatus.DONE);
+
+        service.delete(owner.getId(),completed.record().id());
+
+        TodayResult.Task task=todayTask(routine, today);
+        assertThat(task.status()).isEqualTo(TodayTaskStatus.OVERDUE);
+        assertThat(task.dueDate()).isEqualTo(today.minusDays(2));
+        assertThat(task.overdueDays()).isEqualTo(2);
+    }
+
+    @Test void todayFallsBackToStartDateWhenRoutineHasNoDueDateOrRecord() {
+        CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        LocalDate today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Seoul")));
+        Routine routine=routines.saveAndFlush(Routine.guideline(pet.getId(),feeding.getId(),3,true,null,today,null,clock.instant()));
+
+        TodayResult.Task task=todayTask(routine, today);
+
+        assertThat(task.status()).isEqualTo(TodayTaskStatus.DUE);
+        assertThat(task.dueDate()).isEqualTo(today);
+    }
+
+    @Test void deletingLatestRoutineRecordRecalculatesFromPreviousRecord() {
+        CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        ZoneId kst=ZoneId.of("Asia/Seoul"); LocalDate today=LocalDate.now(clock.withZone(kst));
+        Routine routine=routines.saveAndFlush(Routine.guideline(pet.getId(),feeding.getId(),7,true,null,today.minusDays(5),
+                today.minusDays(5).atTime(12, 0).atZone(kst).toInstant(),clock.instant()));
+        OffsetDateTime earlierAt=OffsetDateTime.now(clock).minusDays(3);
+        service.create(owner.getId(),new CreateRecordRequest(UUID.randomUUID(),pet.getId(),"FEEDING",earlierAt,TimePrecision.EXACT,FeedingOutcome.ATE_ALL,null,null,null,null,null));
+        RecordMutationResponse latest=service.create(owner.getId(),new CreateRecordRequest(UUID.randomUUID(),pet.getId(),"FEEDING",OffsetDateTime.now(clock).minusHours(1),TimePrecision.EXACT,FeedingOutcome.ATE_ALL,null,null,null,null,null));
+
+        service.delete(owner.getId(),latest.record().id());
+
+        LocalDate earlierOn=earlierAt.atZoneSameInstant(kst).toLocalDate();
+        Routine stored=routines.findById(routine.getId()).orElseThrow();
+        assertThat(stored.getNextDueAt()).isEqualTo(earlierOn.plusDays(7).atTime(12, 0).atZone(kst).toInstant());
+        assertThat(stored.getLastDoneOn()).isEqualTo(earlierOn);
+    }
+
+    @Test void deletingOnlyRecordOfRoutineWithoutStartDateLeavesNoDueDate() {
+        CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        Routine routine=routines.saveAndFlush(Routine.active(pet.getId(),feeding.getId(),7,clock.instant()));
+        RecordMutationResponse created=service.create(owner.getId(),request(UUID.randomUUID(),"FEEDING",FeedingOutcome.ATE_ALL,null,null,null,TimePrecision.EXACT));
+
+        service.delete(owner.getId(),created.record().id());
+
+        assertThat(routines.findById(routine.getId()).orElseThrow().getNextDueAt()).isNull();
     }
 
     @Test void enforcesDeletedInactiveExpiredImmutableRangeAndFileErrors() {
@@ -165,6 +233,10 @@ class RecordServiceIntegrationTest {
 
     private CreateRecordRequest request(UUID id,String code,FeedingOutcome outcome,BigDecimal value,com.fasterxml.jackson.databind.JsonNode detail,String memo,TimePrecision precision) {
         return new CreateRecordRequest(id,pet.getId(),code,OffsetDateTime.now(clock).minusHours(1),precision,outcome,value,detail,memo,null,100);
+    }
+    private TodayResult.Task todayTask(Routine routine,LocalDate date) {
+        return todayService.get(owner.getId(),pet.getId(),date).pets().stream().flatMap(p->p.tasks().stream())
+                .filter(t->t.routineId().equals(routine.getId())).findFirst().orElseThrow();
     }
     private void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action,Object code) { assertThatThrownBy(action).isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.errorCode()).isEqualTo(code)); }
 }
