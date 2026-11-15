@@ -11,6 +11,8 @@ import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
+import com.pabom.backend.auth.domain.model.OAuthState;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,19 +30,51 @@ class KakaoOAuthServiceTest {
 
     @Test
     void issuesAuthorizationUrlWithGeneratedState() {
-        given(kakaoOAuthClient.createAuthorizationUrl(org.mockito.ArgumentMatchers.anyString()))
+        given(kakaoOAuthClient.createAuthorizationUrl(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(OAuthClientType.WEB)
+        ))
                 .willAnswer(invocation -> "https://kauth.kakao.com/oauth/authorize?state="
                         + invocation.getArgument(0, String.class));
 
-        OAuthAuthorizationResult result = kakaoOAuthService.issueAuthorizationUrl();
+        OAuthAuthorizationResult result = kakaoOAuthService.issueAuthorizationUrl(null);
 
-        assertThat(result.state()).isNotBlank();
+        assertThat(result.state()).isNotBlank().doesNotContain(".");
         assertThat(result.authorizationUrl()).endsWith(result.state());
     }
 
     @Test
+    void issuesAppAuthorizationUrlWithAppRedirectInState() {
+        given(kakaoOAuthClient.createAuthorizationUrl(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(OAuthClientType.APP)
+        )).willAnswer(invocation -> "https://provider.example/authorize?state="
+                + invocation.getArgument(0, String.class));
+
+        OAuthAuthorizationResult result = kakaoOAuthService.issueAuthorizationUrl("pabom://auth/callback/kakao");
+
+        OAuthState state = OAuthState.parse(result.state());
+        assertThat(state.clientType()).isEqualTo(OAuthClientType.APP);
+        assertThat(state.appRedirectUri()).isEqualTo("pabom://auth/callback/kakao");
+        assertThat(result.authorizationUrl()).endsWith(result.state());
+    }
+
+    @Test
+    void exchangesCodeWithAppRedirectUriWhenStateIsAppState() {
+        String appState = OAuthState.app("pabom-dev://auth/callback/kakao").value();
+        given(kakaoOAuthClient.authenticate("authorization-code", OAuthClientType.APP))
+                .willReturn(SocialUserInfo.kakao("123456", "파봄"));
+
+        OAuthLoginResult result = kakaoOAuthService.login(
+                new OAuthCallbackCommand("authorization-code", appState, appState)
+        );
+
+        assertThat(result.providerId()).isEqualTo("123456");
+    }
+
+    @Test
     void returnsKakaoUserInfoWhenStateMatches() {
-        given(kakaoOAuthClient.authenticate("authorization-code"))
+        given(kakaoOAuthClient.authenticate("authorization-code", OAuthClientType.WEB))
                 .willReturn(SocialUserInfo.kakao("123456", "파봄"));
 
         OAuthLoginResult result = kakaoOAuthService.login(

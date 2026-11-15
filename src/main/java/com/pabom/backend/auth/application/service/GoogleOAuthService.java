@@ -7,9 +7,9 @@ import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
+import com.pabom.backend.auth.domain.model.OAuthState;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.global.error.BusinessException;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -26,10 +26,10 @@ public class GoogleOAuthService implements OAuthService {
     }
 
     @Override
-    public OAuthAuthorizationResult issueAuthorizationUrl() {
-        String state = UUID.randomUUID().toString();
-        String authorizationUrl = googleOAuthClient.createAuthorizationUrl(state);
-        return new OAuthAuthorizationResult(authorizationUrl, state);
+    public OAuthAuthorizationResult issueAuthorizationUrl(String appRedirectUri) {
+        OAuthState state = appRedirectUri == null ? OAuthState.web() : OAuthState.app(appRedirectUri);
+        String authorizationUrl = googleOAuthClient.createAuthorizationUrl(state.value(), state.clientType());
+        return new OAuthAuthorizationResult(authorizationUrl, state.value());
     }
 
     @Override
@@ -39,7 +39,10 @@ public class GoogleOAuthService implements OAuthService {
             throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
         }
 
-        SocialUserInfo userInfo = googleOAuthClient.authenticate(command.authorizationCode());
+        SocialUserInfo userInfo = googleOAuthClient.authenticate(
+                command.authorizationCode(),
+                OAuthState.parse(command.actualState()).clientType()
+        );
         return new OAuthLoginResult(
                 userInfo.provider(),
                 userInfo.providerId(),

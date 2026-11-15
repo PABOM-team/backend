@@ -9,25 +9,32 @@ import com.pabom.backend.auth.application.service.AuthSessionService;
 import com.pabom.backend.auth.application.service.OAuthLoginCompletionService;
 import com.pabom.backend.auth.application.service.OAuthService;
 import com.pabom.backend.auth.application.service.OAuthServiceResolver;
+import com.pabom.backend.auth.domain.error.AuthErrorCode;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
+import com.pabom.backend.auth.domain.model.OAuthState;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
 import com.pabom.backend.auth.presentation.docs.AuthControllerDocs;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
+import com.pabom.backend.auth.presentation.redirect.AppRedirectUriPolicy;
 import com.pabom.backend.auth.presentation.request.SocialTokenLoginRequest;
 import com.pabom.backend.auth.presentation.response.OAuthAuthorizationUrlResponse;
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import com.pabom.backend.auth.presentation.response.TokenRefreshResponse;
+import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.response.ApiResponseBody;
 import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -38,6 +45,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -50,6 +60,7 @@ public class AuthController implements AuthControllerDocs {
     private final AuthSessionService authSessionService;
     private final OAuthPresentationMapper mapper;
     private final RefreshTokenCookieManager refreshTokenCookieManager;
+    private final AppRedirectUriPolicy appRedirectUriPolicy;
     private final boolean googleStateCookieSecure;
     private final boolean kakaoStateCookieSecure;
 
@@ -59,6 +70,7 @@ public class AuthController implements AuthControllerDocs {
             AuthSessionService authSessionService,
             OAuthPresentationMapper mapper,
             RefreshTokenCookieManager refreshTokenCookieManager,
+            AppRedirectUriPolicy appRedirectUriPolicy,
             @Value("${app.google.state-cookie-secure:false}") boolean googleStateCookieSecure,
             @Value("${app.kakao.state-cookie-secure:false}") boolean kakaoStateCookieSecure
     ) {
@@ -67,6 +79,7 @@ public class AuthController implements AuthControllerDocs {
         this.authSessionService = authSessionService;
         this.mapper = mapper;
         this.refreshTokenCookieManager = refreshTokenCookieManager;
+        this.appRedirectUriPolicy = appRedirectUriPolicy;
         this.googleStateCookieSecure = googleStateCookieSecure;
         this.kakaoStateCookieSecure = kakaoStateCookieSecure;
     }
@@ -75,12 +88,16 @@ public class AuthController implements AuthControllerDocs {
     @GetMapping("/{provider}/login-url")
     public ResponseEntity<ApiResponseBody<OAuthAuthorizationUrlResponse>> issueAuthorizationUrl(
             @PathVariable String provider,
+            @RequestParam(name = "redirect_uri", required = false) String redirectUri,
             @Parameter(hidden = true) HttpServletRequest request,
             @Parameter(hidden = true) HttpServletResponse response
     ) {
         OAuthService service = serviceResolver.resolve(provider);
         OAuthProvider oauthProvider = service.provider();
-        OAuthAuthorizationResult result = service.issueAuthorizationUrl();
+        if (redirectUri != null) {
+            appRedirectUriPolicy.validate(oauthProvider, redirectUri);
+        }
+        OAuthAuthorizationResult result = service.issueAuthorizationUrl(redirectUri);
         addStateCookie(response, oauthProvider, result.state(), STATE_COOKIE_MAX_AGE);
         return ResponseEntity.ok(ApiResponseBody.success(mapper.toResponse(result), request));
     }
@@ -108,6 +125,42 @@ public class AuthController implements AuthControllerDocs {
             );
         }
         return ResponseEntity.ok(mapper.toResponse(result));
+    }
+
+    @Override
+    @GetMapping("/{provider}/app-callback")
+    public ResponseEntity<Void> appCallback(
+            @PathVariable String provider,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            @RequestParam(name = "error_description", required = false) String errorDescription
+    ) {
+        OAuthProvider oauthProvider = serviceResolver.resolve(provider).provider();
+        OAuthState oauthState = OAuthState.parse(state);
+        if (oauthState.clientType() != OAuthClientType.APP) {
+            throw new BusinessException(AuthErrorCode.REDIRECT_URI_NOT_ALLOWED);
+        }
+        appRedirectUriPolicy.validate(oauthProvider, oauthState.appRedirectUri());
+
+        UriComponentsBuilder location = UriComponentsBuilder.fromUriString(oauthState.appRedirectUri());
+        if (StringUtils.hasText(error)) {
+            addEncodedQueryParam(location, "error", error);
+            if (StringUtils.hasText(errorDescription)) {
+                addEncodedQueryParam(location, "message", errorDescription);
+            }
+        } else if (!StringUtils.hasText(code)) {
+            addEncodedQueryParam(location, "error", AuthErrorCode.VALIDATION_FAILED.getCode());
+            addEncodedQueryParam(location, "message", AuthErrorCode.VALIDATION_FAILED.getMessage());
+        } else {
+            addEncodedQueryParam(location, "code", code);
+        }
+        addEncodedQueryParam(location, "state", state);
+
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, location.build(true).toUriString())
+                .cacheControl(CacheControl.noStore())
+                .build();
     }
 
     @Override
@@ -162,6 +215,10 @@ public class AuthController implements AuthControllerDocs {
             refreshTokenCookieManager.clear(response);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private void addEncodedQueryParam(UriComponentsBuilder builder, String name, String value) {
+        builder.queryParam(name, UriUtils.encode(value, StandardCharsets.UTF_8));
     }
 
     private String findStateCookie(HttpServletRequest request, OAuthProvider provider) {

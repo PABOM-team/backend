@@ -3,6 +3,7 @@ package com.pabom.backend.auth.infrastructure.oauth;
 import com.pabom.backend.auth.application.port.GoogleOAuthClientPort;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.exception.InvalidSocialUserInfoException;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.auth.infrastructure.oauth.dto.GoogleTokenResponse;
 import com.pabom.backend.auth.infrastructure.oauth.dto.GoogleUserInfoResponse;
@@ -41,6 +42,7 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
     private static final String USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
     private static final String REQUIRED_SCOPES = "openid profile";
     private static final String CALLBACK_PATH = "/api/v1/auth/google/callback";
+    private static final String APP_CALLBACK_PATH = "/api/v1/auth/google/app-callback";
     private static final String JWK_SET_URL = "https://www.googleapis.com/oauth2/v3/certs";
     private static final Set<String> ALLOWED_ISSUERS = Set.of(
             "accounts.google.com",
@@ -58,11 +60,11 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
     }
 
     @Override
-    public String createAuthorizationUrl(String state) {
-        validateConfiguration();
+    public String createAuthorizationUrl(String state, OAuthClientType clientType) {
+        validateConfiguration(clientType);
         return UriComponentsBuilder.fromUriString(AUTHORIZATION_URL)
                 .queryParam("client_id", properties.clientId())
-                .queryParam("redirect_uri", properties.redirectUri())
+                .queryParam("redirect_uri", redirectUri(clientType))
                 .queryParam("response_type", "code")
                 .queryParam("scope", REQUIRED_SCOPES)
                 .queryParam("state", state)
@@ -72,10 +74,10 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
     }
 
     @Override
-    public SocialUserInfo authenticate(String authorizationCode) {
-        validateConfiguration();
+    public SocialUserInfo authenticate(String authorizationCode, OAuthClientType clientType) {
+        validateConfiguration(clientType);
         try {
-            String accessToken = exchangeCode(authorizationCode);
+            String accessToken = exchangeCode(authorizationCode, redirectUri(clientType));
             GoogleUserInfoResponse userInfo = requestUserInfo(accessToken);
             if (userInfo == null || !StringUtils.hasText(userInfo.sub())) {
                 throw new InvalidSocialUserInfoException("구글 회원 식별자가 없습니다.");
@@ -127,12 +129,12 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
         return decoder;
     }
 
-    private String exchangeCode(String authorizationCode) {
+    private String exchangeCode(String authorizationCode, String redirectUri) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("client_id", properties.clientId());
         form.add("client_secret", properties.clientSecret());
-        form.add("redirect_uri", properties.redirectUri());
+        form.add("redirect_uri", redirectUri);
         form.add("code", authorizationCode);
 
         HttpHeaders headers = new HttpHeaders();
@@ -169,11 +171,17 @@ public class GoogleOAuthClient implements GoogleOAuthClientPort {
         }
     }
 
-    private void validateConfiguration() {
+    private String redirectUri(OAuthClientType clientType) {
+        return clientType == OAuthClientType.APP ? properties.appRedirectUri() : properties.redirectUri();
+    }
+
+    private void validateConfiguration(OAuthClientType clientType) {
+        String redirectUri = redirectUri(clientType);
+        String callbackPath = clientType == OAuthClientType.APP ? APP_CALLBACK_PATH : CALLBACK_PATH;
         if (!StringUtils.hasText(properties.clientId())
                 || !StringUtils.hasText(properties.clientSecret())
-                || !StringUtils.hasText(properties.redirectUri())
-                || !properties.redirectUri().endsWith(CALLBACK_PATH)) {
+                || !StringUtils.hasText(redirectUri)
+                || !redirectUri.endsWith(callbackPath)) {
             throw new BusinessException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
         }
     }

@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record GoogleOAuthProperties(
         String clientId,
         String clientSecret,
-        String redirectUri
+        String redirectUri,
+        String appRedirectUri
 ) {
 }

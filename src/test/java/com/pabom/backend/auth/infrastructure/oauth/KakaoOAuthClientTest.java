@@ -12,6 +12,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import com.pabom.backend.global.error.BusinessException;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ class KakaoOAuthClientTest {
 
     private static final String REDIRECT_URI =
             "https://dev.pabom.app/api/v1/auth/kakao/callback";
+    private static final String APP_REDIRECT_URI =
+            "https://dev.api.pabom.app/api/v1/auth/kakao/app-callback";
 
     private MockRestServiceServer server;
     private KakaoOAuthClient kakaoOAuthClient;
@@ -38,14 +41,15 @@ class KakaoOAuthClientTest {
                 "client-id",
                 "123456789",
                 "client-secret",
-                REDIRECT_URI
+                REDIRECT_URI,
+                APP_REDIRECT_URI
         );
         kakaoOAuthClient = new KakaoOAuthClient(restTemplate, properties);
     }
 
     @Test
     void createsAuthorizationUrlWithRequiredScopes() {
-        String authorizationUrl = kakaoOAuthClient.createAuthorizationUrl("state-value");
+        String authorizationUrl = kakaoOAuthClient.createAuthorizationUrl("state-value", OAuthClientType.WEB);
 
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
@@ -54,6 +58,43 @@ class KakaoOAuthClientTest {
                 .contains("scope=profile_nickname")
                 .doesNotContain("account_email")
                 .contains("state=state-value");
+    }
+
+    @Test
+    void createsAppAuthorizationUrlWithAppRedirectUri() {
+        String authorizationUrl = kakaoOAuthClient.createAuthorizationUrl("state-value", OAuthClientType.APP);
+
+        assertThat(authorizationUrl)
+                .contains("redirect_uri=" + APP_REDIRECT_URI)
+                .contains("state=state-value");
+    }
+
+    @Test
+    void exchangesAppCodeWithAppRedirectUri() {
+        server.expect(once(), requestTo("https://kauth.kakao.com/oauth/token"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "redirect_uri=https%3A%2F%2Fdev.api.pabom.app%2Fapi%2Fv1%2Fauth%2Fkakao%2Fapp-callback")))
+                .andRespond(withSuccess("{\"access_token\":\"access-token\"}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo("https://kapi.kakao.com/v2/user/me"))
+                .andRespond(withSuccess("{\"id\":123456}", MediaType.APPLICATION_JSON));
+
+        SocialUserInfo userInfo = kakaoOAuthClient.authenticate("authorization-code", OAuthClientType.APP);
+
+        assertThat(userInfo.providerId()).isEqualTo("123456");
+        server.verify();
+    }
+
+    @Test
+    void rejectsAppLoginWhenAppRedirectUriIsNotConfigured() {
+        KakaoOAuthClient client = new KakaoOAuthClient(
+                new RestTemplate(),
+                new KakaoOAuthProperties("client-id", "123456789", "client-secret", REDIRECT_URI, null)
+        );
+
+        assertThatThrownBy(() -> client.createAuthorizationUrl("state-value", OAuthClientType.APP))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("INTERNAL_SERVER_ERROR"));
     }
 
     @Test
@@ -82,7 +123,7 @@ class KakaoOAuthClientTest {
                         MediaType.APPLICATION_JSON
                 ));
 
-        SocialUserInfo userInfo = kakaoOAuthClient.authenticate("authorization-code");
+        SocialUserInfo userInfo = kakaoOAuthClient.authenticate("authorization-code", OAuthClientType.WEB);
 
         assertThat(userInfo.providerId()).isEqualTo("123456");
         assertThat(userInfo.nickname()).isEqualTo("파봄");
@@ -94,7 +135,7 @@ class KakaoOAuthClientTest {
         server.expect(once(), requestTo("https://kauth.kakao.com/oauth/token"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        assertThatThrownBy(() -> kakaoOAuthClient.authenticate("invalid-code"))
+        assertThatThrownBy(() -> kakaoOAuthClient.authenticate("invalid-code", OAuthClientType.WEB))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("KAKAO_CODE_INVALID"));
@@ -105,7 +146,7 @@ class KakaoOAuthClientTest {
         server.expect(once(), requestTo("https://kauth.kakao.com/oauth/token"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatThrownBy(() -> kakaoOAuthClient.authenticate("authorization-code"))
+        assertThatThrownBy(() -> kakaoOAuthClient.authenticate("authorization-code", OAuthClientType.WEB))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("KAKAO_UNAVAILABLE"));

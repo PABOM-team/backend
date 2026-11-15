@@ -22,7 +22,15 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Auth", description = "OAuth 로그인 및 인증 세션 관리 API")
 public interface AuthControllerDocs {
 
-    @Operation(summary = "OAuth 로그인 URL 발급", description = "provider에 해당하는 로그인 URL과 CSRF 방지용 state 쿠키를 발급합니다.")
+    @Operation(
+            summary = "OAuth 로그인 URL 발급",
+            description = """
+                    provider에 해당하는 로그인 URL과 CSRF 방지용 state 쿠키를 발급합니다.
+                    - 웹: redirect_uri 없이 호출합니다. Provider는 웹 Redirect URI(.../{provider}/callback)로 돌아갑니다.
+                    - 앱: redirect_uri에 앱 주소(예: pabom://auth/callback/kakao)를 넘깁니다. 서버 허용 목록(AUTH_APP_REDIRECT_URIS)과 정확히 일치해야 하며,
+                      Provider는 백엔드 app-callback으로 돌아간 뒤 앱 주소로 302 이동합니다. 이후 앱이 OAuth Callback API를 code·state로 호출합니다.
+                    """
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -37,12 +45,20 @@ public interface AuthControllerDocs {
                     description = "UNSUPPORTED_OAUTH_PROVIDER: 지원하지 않는 OAuth 제공자",
                     content = @Content(
                             mediaType = "application/json",
-                            examples = @ExampleObject(name = "지원하지 않는 Provider", value = UNSUPPORTED_PROVIDER_EXAMPLE)
+                            examples = {
+                                    @ExampleObject(name = "지원하지 않는 Provider", value = UNSUPPORTED_PROVIDER_EXAMPLE),
+                                    @ExampleObject(name = "허용되지 않은 앱 Redirect URI", value = REDIRECT_URI_NOT_ALLOWED_EXAMPLE)
+                            }
                     )
             )
     })
     ResponseEntity<ApiResponseBody<OAuthAuthorizationUrlResponse>> issueAuthorizationUrl(
             @Parameter(description = "OAuth 제공자", example = "google", required = true) String provider,
+            @Parameter(
+                    name = "redirect_uri",
+                    description = "앱 로그인일 때만 넘기는 앱 주소. 허용 목록에 있는 값만 가능합니다.",
+                    example = "pabom://auth/callback/kakao"
+            ) String redirectUri,
             HttpServletRequest request,
             HttpServletResponse response
     );
@@ -102,6 +118,47 @@ public interface AuthControllerDocs {
             String state,
             HttpServletRequest request,
             HttpServletResponse response
+    );
+
+    @Operation(
+            summary = "앱 OAuth Redirect",
+            description = """
+                    앱 로그인(login-url에 redirect_uri를 넘긴 경우)에서 Provider가 돌아오는 주소입니다. Provider 콘솔에 등록하는 Redirect URI입니다.
+                    state에 담긴 앱 주소를 허용 목록으로 다시 검증한 뒤 302로 이동합니다.
+                    - 성공: {앱 주소}?code={code}&state={state}
+                    - 실패/취소: {앱 주소}?error={error}&message={error_description}&state={state} (동의 취소는 error=access_denied)
+                    state가 없거나 앱 로그인 state가 아니면 이동하지 않고 REDIRECT_URI_NOT_ALLOWED를 응답합니다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "302",
+                    description = "앱 주소로 이동",
+                    headers = @Header(
+                            name = "Location",
+                            description = "pabom://auth/callback/kakao?code=...&state=...",
+                            schema = @Schema(type = "string")
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "REDIRECT_URI_NOT_ALLOWED: state가 없거나 앱 로그인 state가 아니거나 앱 주소가 허용 목록에 없음, UNSUPPORTED_OAUTH_PROVIDER: 지원하지 않는 provider",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = {
+                                    @ExampleObject(name = "REDIRECT_URI_NOT_ALLOWED", value = APP_CALLBACK_REDIRECT_URI_NOT_ALLOWED_EXAMPLE),
+                                    @ExampleObject(name = "UNSUPPORTED_OAUTH_PROVIDER", value = APP_CALLBACK_UNSUPPORTED_PROVIDER_EXAMPLE)
+                            }
+                    )
+            )
+    })
+    ResponseEntity<Void> appCallback(
+            @Parameter(description = "OAuth 제공자", example = "kakao", required = true) String provider,
+            @Parameter(description = "Provider 인가 코드") String code,
+            @Parameter(description = "login-url에서 발급한 state") String state,
+            @Parameter(description = "Provider 오류 코드 (예: access_denied)") String error,
+            @Parameter(name = "error_description", description = "Provider 오류 설명") String errorDescription
     );
 
     @Operation(
@@ -304,6 +361,54 @@ public interface AuthControllerDocs {
               "meta": {
                 "timestamp": "2026-10-09T12:00:00",
                 "path": "/api/v1/auth/naver/login-url"
+              }
+            }
+            """;
+
+    String REDIRECT_URI_NOT_ALLOWED_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "REDIRECT_URI_NOT_ALLOWED",
+                "message": "허용되지 않은 Redirect URI입니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/kakao/login-url"
+              }
+            }
+            """;
+
+    String APP_CALLBACK_REDIRECT_URI_NOT_ALLOWED_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "REDIRECT_URI_NOT_ALLOWED",
+                "message": "허용되지 않은 Redirect URI입니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/kakao/app-callback"
+              }
+            }
+            """;
+
+    String APP_CALLBACK_UNSUPPORTED_PROVIDER_EXAMPLE = """
+            {
+              "resultType": "FAIL",
+              "success": null,
+              "error": {
+                "code": "UNSUPPORTED_OAUTH_PROVIDER",
+                "message": "지원하지 않는 OAuth 제공자입니다.",
+                "details": null
+              },
+              "meta": {
+                "timestamp": "2026-10-09T12:00:00",
+                "path": "/api/v1/auth/naver/app-callback"
               }
             }
             """;

@@ -3,6 +3,7 @@ package com.pabom.backend.auth.infrastructure.oauth;
 import com.pabom.backend.auth.application.port.KakaoOAuthClientPort;
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.exception.InvalidSocialUserInfoException;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.auth.infrastructure.oauth.dto.KakaoAccessTokenInfoResponse;
 import com.pabom.backend.auth.infrastructure.oauth.dto.KakaoTokenResponse;
@@ -34,16 +35,17 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
     private static final String ACCESS_TOKEN_INFO_URL = "https://kapi.kakao.com/v1/user/access_token_info";
     private static final String REQUIRED_SCOPES = "profile_nickname";
     private static final String CALLBACK_PATH = "/api/v1/auth/kakao/callback";
+    private static final String APP_CALLBACK_PATH = "/api/v1/auth/kakao/app-callback";
 
     private final RestTemplate restTemplate;
     private final KakaoOAuthProperties properties;
 
     @Override
-    public String createAuthorizationUrl(String state) {
-        validateConfiguration();
+    public String createAuthorizationUrl(String state, OAuthClientType clientType) {
+        validateConfiguration(clientType);
         return UriComponentsBuilder.fromUriString(AUTHORIZATION_URL)
                 .queryParam("client_id", properties.clientId())
-                .queryParam("redirect_uri", properties.redirectUri())
+                .queryParam("redirect_uri", redirectUri(clientType))
                 .queryParam("response_type", "code")
                 .queryParam("scope", REQUIRED_SCOPES)
                 .queryParam("state", state)
@@ -53,10 +55,10 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
     }
 
     @Override
-    public SocialUserInfo authenticate(String authorizationCode) {
-        validateConfiguration();
+    public SocialUserInfo authenticate(String authorizationCode, OAuthClientType clientType) {
+        validateConfiguration(clientType);
         try {
-            String accessToken = exchangeCode(authorizationCode);
+            String accessToken = exchangeCode(authorizationCode, redirectUri(clientType));
             return fetchUserInfo(accessToken);
         } catch (BusinessException exception) {
             throw exception;
@@ -116,11 +118,11 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
         }
     }
 
-    private String exchangeCode(String authorizationCode) {
+    private String exchangeCode(String authorizationCode, String redirectUri) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "authorization_code");
         form.add("client_id", properties.clientId());
-        form.add("redirect_uri", properties.redirectUri());
+        form.add("redirect_uri", redirectUri);
         form.add("code", authorizationCode);
         if (StringUtils.hasText(properties.clientSecret())) {
             form.add("client_secret", properties.clientSecret());
@@ -160,10 +162,16 @@ public class KakaoOAuthClient implements KakaoOAuthClientPort {
         }
     }
 
-    private void validateConfiguration() {
+    private String redirectUri(OAuthClientType clientType) {
+        return clientType == OAuthClientType.APP ? properties.appRedirectUri() : properties.redirectUri();
+    }
+
+    private void validateConfiguration(OAuthClientType clientType) {
+        String redirectUri = redirectUri(clientType);
+        String callbackPath = clientType == OAuthClientType.APP ? APP_CALLBACK_PATH : CALLBACK_PATH;
         if (!StringUtils.hasText(properties.clientId())
-                || !StringUtils.hasText(properties.redirectUri())
-                || !properties.redirectUri().endsWith(CALLBACK_PATH)) {
+                || !StringUtils.hasText(redirectUri)
+                || !redirectUri.endsWith(callbackPath)) {
             throw new BusinessException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
         }
     }

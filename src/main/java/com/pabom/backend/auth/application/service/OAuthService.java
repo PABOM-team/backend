@@ -10,7 +10,10 @@ public interface OAuthService {
 
     OAuthProvider provider();
 
-    OAuthAuthorizationResult issueAuthorizationUrl();
+    /**
+     * @param appRedirectUri 앱 로그인이면 허용 목록 검증을 마친 앱 주소, 웹 로그인이면 null
+     */
+    OAuthAuthorizationResult issueAuthorizationUrl(String appRedirectUri);
 
     OAuthLoginResult login(OAuthCallbackCommand command);
 
