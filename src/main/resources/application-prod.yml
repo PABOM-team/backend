@@ -28,9 +28,11 @@ app:
     secret: ${JWT_SECRET}
   kakao:
     redirect-uri: ${KAKAO_REDIRECT_URI:https://api.pabom.app/api/v1/auth/kakao/callback}
+    app-redirect-uri: ${KAKAO_APP_REDIRECT_URI:https://api.pabom.app/api/v1/auth/kakao/app-callback}
     state-cookie-secure: true
   google:
     redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.pabom.app/api/v1/auth/google/callback}
+    app-redirect-uri: ${GOOGLE_APP_REDIRECT_URI:https://api.pabom.app/api/v1/auth/google/app-callback}
     state-cookie-secure: true
 
 logging:

@@ -1,6 +1,7 @@
 package com.pabom.backend.auth.presentation;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -23,6 +24,9 @@ import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.auth.presentation.mapper.OAuthPresentationMapper;
 import com.pabom.backend.auth.presentation.cookie.RefreshTokenCookieManager;
+import com.pabom.backend.auth.presentation.redirect.AppRedirectUriPolicy;
+import com.pabom.backend.auth.infrastructure.config.AuthAppRedirectProperties;
+import com.pabom.backend.auth.domain.model.OAuthState;
 import com.pabom.backend.auth.infrastructure.config.AuthWebProperties;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.global.error.GlobalExceptionHandler;
@@ -66,6 +70,10 @@ class OAuthControllerTest {
                 authSessionService,
                 new OAuthPresentationMapper(),
                 new RefreshTokenCookieManager(new AuthWebProperties(List.of(), true, "Lax")),
+                new AppRedirectUriPolicy(new AuthAppRedirectProperties(List.of(
+                        "pabom://auth/callback/{provider}",
+                        "pabom-dev://auth/callback/{provider}"
+                ))),
                 false,
                 false
         );
@@ -76,7 +84,7 @@ class OAuthControllerTest {
 
     @Test
     void routesGoogleAuthorizationUrlRequestAndSetsGoogleStateCookie() throws Exception {
-        given(googleOAuthService.issueAuthorizationUrl()).willReturn(
+        given(googleOAuthService.issueAuthorizationUrl(null)).willReturn(
                 new OAuthAuthorizationResult(
                         "https://accounts.google.com/o/oauth2/v2/auth?state=state-value",
                         "state-value"
@@ -95,12 +103,12 @@ class OAuthControllerTest {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")));
 
-        verify(googleOAuthService).issueAuthorizationUrl();
+        verify(googleOAuthService).issueAuthorizationUrl(null);
     }
 
     @Test
     void routesKakaoAuthorizationUrlRequestAndSetsKakaoStateCookie() throws Exception {
-        given(kakaoOAuthService.issueAuthorizationUrl()).willReturn(
+        given(kakaoOAuthService.issueAuthorizationUrl(null)).willReturn(
                 new OAuthAuthorizationResult(
                         "https://kauth.kakao.com/oauth/authorize?state=state-value",
                         "state-value"
@@ -116,7 +124,120 @@ class OAuthControllerTest {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         containsString("Path=/api/v1/auth/kakao/callback")));
 
-        verify(kakaoOAuthService).issueAuthorizationUrl();
+        verify(kakaoOAuthService).issueAuthorizationUrl(null);
+    }
+
+    @Test
+    void issuesAppAuthorizationUrlForAllowedAppRedirectUri() throws Exception {
+        given(kakaoOAuthService.issueAuthorizationUrl("pabom-dev://auth/callback/kakao")).willReturn(
+                new OAuthAuthorizationResult(
+                        "https://kauth.kakao.com/oauth/authorize?state=app-state",
+                        "app-state"
+                )
+        );
+
+        mockMvc.perform(get("/api/v1/auth/kakao/login-url")
+                        .param("redirect_uri", "pabom-dev://auth/callback/kakao"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success.data.authorizationUrl")
+                        .value("https://kauth.kakao.com/oauth/authorize?state=app-state"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        containsString("kakao_oauth_state=app-state")))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        containsString("Path=/api/v1/auth/kakao/callback")));
+    }
+
+    @Test
+    void rejectsAppRedirectUriNotInAllowlist() throws Exception {
+        for (String redirectUri : List.of(
+                "evil://auth/callback/kakao",
+                "pabom://auth/callback/google",
+                "pabom://auth/callback/kakao/extra",
+                "https://dev.pabom.app/auth/callback/kakao",
+                ""
+        )) {
+            mockMvc.perform(get("/api/v1/auth/kakao/login-url").param("redirect_uri", redirectUri))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("REDIRECT_URI_NOT_ALLOWED"))
+                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        }
+
+        verify(kakaoOAuthService, org.mockito.Mockito.never()).issueAuthorizationUrl(any());
+    }
+
+    @Test
+    void appCallbackRedirectsToAppWithCodeAndState() throws Exception {
+        String state = OAuthState.app("pabom://auth/callback/kakao").value();
+
+        mockMvc.perform(get("/api/v1/auth/kakao/app-callback")
+                        .param("code", "code/with+special")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andExpect(header().string(HttpHeaders.LOCATION,
+                        "pabom://auth/callback/kakao?code=code%2Fwith%2Bspecial&state=" + state))
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
+
+        verify(kakaoOAuthService, org.mockito.Mockito.never()).login(any());
+    }
+
+    @Test
+    void appCallbackRedirectsProviderErrorToApp() throws Exception {
+        String state = OAuthState.app("pabom-dev://auth/callback/google").value();
+
+        mockMvc.perform(get("/api/v1/auth/google/app-callback")
+                        .param("error", "access_denied")
+                        .param("error_description", "User denied access")
+                        .param("state", state))
+                .andExpect(status().isFound())
+                .andExpect(header().string(HttpHeaders.LOCATION,
+                        "pabom-dev://auth/callback/google?error=access_denied"
+                                + "&message=User%20denied%20access&state=" + state));
+    }
+
+    @Test
+    void appCallbackRedirectsValidationErrorWhenCodeIsMissing() throws Exception {
+        String state = OAuthState.app("pabom://auth/callback/kakao").value();
+
+        mockMvc.perform(get("/api/v1/auth/kakao/app-callback").param("state", state))
+                .andExpect(status().isFound())
+                .andExpect(header().string(HttpHeaders.LOCATION,
+                        containsString("pabom://auth/callback/kakao?error=VALIDATION_FAILED&message=")));
+    }
+
+    @Test
+    void appCallbackRejectsWebStateOrMissingState() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/kakao/app-callback")
+                        .param("code", "authorization-code")
+                        .param("state", OAuthState.web().value()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("REDIRECT_URI_NOT_ALLOWED"))
+                .andExpect(header().doesNotExist(HttpHeaders.LOCATION));
+
+        mockMvc.perform(get("/api/v1/auth/kakao/app-callback").param("code", "authorization-code"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("REDIRECT_URI_NOT_ALLOWED"));
+    }
+
+    @Test
+    void appCallbackRejectsTamperedRedirectUriInState() throws Exception {
+        // 허용 목록에 없는 주소나 다른 Provider용 주소를 state에 넣어도 이동하지 않는다
+        for (String target : List.of("evil://steal", "pabom://auth/callback/google")) {
+            mockMvc.perform(get("/api/v1/auth/kakao/app-callback")
+                            .param("code", "authorization-code")
+                            .param("state", OAuthState.app(target).value()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("REDIRECT_URI_NOT_ALLOWED"))
+                    .andExpect(header().doesNotExist(HttpHeaders.LOCATION));
+        }
+    }
+
+    @Test
+    void appCallbackRejectsUnsupportedProvider() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/naver/app-callback")
+                        .param("code", "authorization-code")
+                        .param("state", OAuthState.app("pabom://auth/callback/naver").value()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("UNSUPPORTED_OAUTH_PROVIDER"));
     }
 
     @Test

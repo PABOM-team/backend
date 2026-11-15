@@ -18,8 +18,27 @@ class AuthSwaggerTest {
 
     private static final String TOKEN_LOGIN = "$.paths['/api/v1/auth/{provider}/token'].post";
 
+    private static final String LOGIN_URL = "$.paths['/api/v1/auth/{provider}/login-url'].get";
+    private static final String APP_CALLBACK = "$.paths['/api/v1/auth/{provider}/app-callback'].get";
+
     @Autowired
     private MockMvc mockMvc;
+
+    @Test
+    void documentsAppRedirectParameterAndAppCallback() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(LOGIN_URL + ".parameters[?(@.name == 'redirect_uri')].in").value("query"))
+                .andExpect(jsonPath(LOGIN_URL + ".responses['400'].content['application/json'].examples"
+                        + "['허용되지 않은 앱 Redirect URI'].value.error.code").value("REDIRECT_URI_NOT_ALLOWED"))
+                .andExpect(jsonPath(APP_CALLBACK + ".tags[0]").value("Auth"))
+                .andExpect(jsonPath(APP_CALLBACK + ".parameters[?(@.name == 'error_description')].in").value("query"))
+                .andExpect(jsonPath(APP_CALLBACK + ".responses['302'].headers.Location").exists())
+                .andExpect(jsonPath(APP_CALLBACK + ".responses['400'].content['application/json'].examples"
+                        + ".REDIRECT_URI_NOT_ALLOWED.value.error.code").value("REDIRECT_URI_NOT_ALLOWED"))
+                .andExpect(jsonPath(APP_CALLBACK + ".responses['400'].content['application/json'].examples"
+                        + ".UNSUPPORTED_OAUTH_PROVIDER.value.error.code").value("UNSUPPORTED_OAUTH_PROVIDER"));
+    }
 
     @Test
     void documentsSocialTokenLoginEnvelopeRequestAndAllErrorCodes() throws Exception {

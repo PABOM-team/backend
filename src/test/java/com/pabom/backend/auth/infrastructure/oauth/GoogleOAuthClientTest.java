@@ -23,6 +23,7 @@ import com.nimbusds.jwt.SignedJWT;
 import com.pabom.backend.global.error.BusinessException;
 import java.time.Instant;
 import java.util.Date;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,8 @@ class GoogleOAuthClientTest {
 
     private static final String REDIRECT_URI =
             "https://dev.pabom.app/api/v1/auth/google/callback";
+    private static final String APP_REDIRECT_URI =
+            "https://dev.api.pabom.app/api/v1/auth/google/app-callback";
     private static final String JWK_SET_URL = "https://www.googleapis.com/oauth2/v3/certs";
     private static final RSAKey GOOGLE_SIGNING_KEY = generateKey("google-key");
     private static final RSAKey FOREIGN_SIGNING_KEY = generateKey("google-key");
@@ -51,14 +54,15 @@ class GoogleOAuthClientTest {
         GoogleOAuthProperties properties = new GoogleOAuthProperties(
                 "client-id",
                 "client-secret",
-                REDIRECT_URI
+                REDIRECT_URI,
+                APP_REDIRECT_URI
         );
         googleOAuthClient = new GoogleOAuthClient(restTemplate, properties);
     }
 
     @Test
     void createsAuthorizationUrlWithRequiredScopes() {
-        String authorizationUrl = googleOAuthClient.createAuthorizationUrl("state-value");
+        String authorizationUrl = googleOAuthClient.createAuthorizationUrl("state-value", OAuthClientType.WEB);
 
         assertThat(authorizationUrl)
                 .contains("client_id=client-id")
@@ -67,6 +71,43 @@ class GoogleOAuthClientTest {
                 .contains("scope=openid%20profile")
                 .doesNotContain("email")
                 .contains("state=state-value");
+    }
+
+    @Test
+    void createsAppAuthorizationUrlWithAppRedirectUri() {
+        String authorizationUrl = googleOAuthClient.createAuthorizationUrl("state-value", OAuthClientType.APP);
+
+        assertThat(authorizationUrl)
+                .contains("redirect_uri=" + APP_REDIRECT_URI)
+                .contains("state=state-value");
+    }
+
+    @Test
+    void exchangesAppCodeWithAppRedirectUri() {
+        server.expect(once(), requestTo("https://oauth2.googleapis.com/token"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "redirect_uri=https%3A%2F%2Fdev.api.pabom.app%2Fapi%2Fv1%2Fauth%2Fgoogle%2Fapp-callback")))
+                .andRespond(withSuccess("{\"access_token\":\"access-token\"}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo("https://openidconnect.googleapis.com/v1/userinfo"))
+                .andRespond(withSuccess("{\"sub\":\"123456\"}", MediaType.APPLICATION_JSON));
+
+        SocialUserInfo userInfo = googleOAuthClient.authenticate("authorization-code", OAuthClientType.APP);
+
+        assertThat(userInfo.providerId()).isEqualTo("123456");
+        server.verify();
+    }
+
+    @Test
+    void rejectsAppLoginWhenAppRedirectUriIsNotConfigured() {
+        GoogleOAuthClient client = new GoogleOAuthClient(
+                new RestTemplate(),
+                new GoogleOAuthProperties("client-id", "client-secret", REDIRECT_URI, null)
+        );
+
+        assertThatThrownBy(() -> client.createAuthorizationUrl("state-value", OAuthClientType.APP))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> assertThat(((BusinessException) exception)
+                        .errorCode().getCode()).isEqualTo("INTERNAL_SERVER_ERROR"));
     }
 
     @Test
@@ -93,7 +134,7 @@ class GoogleOAuthClientTest {
                         MediaType.APPLICATION_JSON
                 ));
 
-        SocialUserInfo userInfo = googleOAuthClient.authenticate("authorization-code");
+        SocialUserInfo userInfo = googleOAuthClient.authenticate("authorization-code", OAuthClientType.WEB);
 
         assertThat(userInfo.provider().name()).isEqualTo("GOOGLE");
         assertThat(userInfo.providerId()).isEqualTo("123456");
@@ -106,7 +147,7 @@ class GoogleOAuthClientTest {
         server.expect(once(), requestTo("https://oauth2.googleapis.com/token"))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST));
 
-        assertThatThrownBy(() -> googleOAuthClient.authenticate("invalid-code"))
+        assertThatThrownBy(() -> googleOAuthClient.authenticate("invalid-code", OAuthClientType.WEB))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("GOOGLE_CODE_INVALID"));
@@ -117,7 +158,7 @@ class GoogleOAuthClientTest {
         server.expect(once(), requestTo("https://oauth2.googleapis.com/token"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
-        assertThatThrownBy(() -> googleOAuthClient.authenticate("authorization-code"))
+        assertThatThrownBy(() -> googleOAuthClient.authenticate("authorization-code", OAuthClientType.WEB))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> assertThat(((BusinessException) exception)
                         .errorCode().getCode()).isEqualTo("GOOGLE_UNAVAILABLE"));

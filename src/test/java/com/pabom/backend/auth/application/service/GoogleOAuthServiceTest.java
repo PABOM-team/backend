@@ -11,6 +11,8 @@ import com.pabom.backend.auth.application.command.OAuthTokenLoginCommand;
 import com.pabom.backend.auth.application.port.GoogleOAuthClientPort;
 import com.pabom.backend.auth.application.result.OAuthAuthorizationResult;
 import com.pabom.backend.auth.application.result.OAuthLoginResult;
+import com.pabom.backend.auth.domain.model.OAuthClientType;
+import com.pabom.backend.auth.domain.model.OAuthState;
 import com.pabom.backend.auth.domain.model.SocialUserInfo;
 import com.pabom.backend.global.error.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,19 +30,51 @@ class GoogleOAuthServiceTest {
 
     @Test
     void issuesAuthorizationUrlWithGeneratedState() {
-        given(googleOAuthClient.createAuthorizationUrl(org.mockito.ArgumentMatchers.anyString()))
+        given(googleOAuthClient.createAuthorizationUrl(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(OAuthClientType.WEB)
+        ))
                 .willAnswer(invocation -> "https://accounts.google.com/o/oauth2/v2/auth?state="
                         + invocation.getArgument(0, String.class));
 
-        OAuthAuthorizationResult result = googleOAuthService.issueAuthorizationUrl();
+        OAuthAuthorizationResult result = googleOAuthService.issueAuthorizationUrl(null);
 
-        assertThat(result.state()).isNotBlank();
+        assertThat(result.state()).isNotBlank().doesNotContain(".");
         assertThat(result.authorizationUrl()).endsWith(result.state());
     }
 
     @Test
+    void issuesAppAuthorizationUrlWithAppRedirectInState() {
+        given(googleOAuthClient.createAuthorizationUrl(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(OAuthClientType.APP)
+        )).willAnswer(invocation -> "https://provider.example/authorize?state="
+                + invocation.getArgument(0, String.class));
+
+        OAuthAuthorizationResult result = googleOAuthService.issueAuthorizationUrl("pabom://auth/callback/google");
+
+        OAuthState state = OAuthState.parse(result.state());
+        assertThat(state.clientType()).isEqualTo(OAuthClientType.APP);
+        assertThat(state.appRedirectUri()).isEqualTo("pabom://auth/callback/google");
+        assertThat(result.authorizationUrl()).endsWith(result.state());
+    }
+
+    @Test
+    void exchangesCodeWithAppRedirectUriWhenStateIsAppState() {
+        String appState = OAuthState.app("pabom-dev://auth/callback/google").value();
+        given(googleOAuthClient.authenticate("authorization-code", OAuthClientType.APP))
+                .willReturn(SocialUserInfo.google("123456", "파봄"));
+
+        OAuthLoginResult result = googleOAuthService.login(
+                new OAuthCallbackCommand("authorization-code", appState, appState)
+        );
+
+        assertThat(result.providerId()).isEqualTo("123456");
+    }
+
+    @Test
     void returnsGoogleUserInfoWhenStateMatches() {
-        given(googleOAuthClient.authenticate("authorization-code"))
+        given(googleOAuthClient.authenticate("authorization-code", OAuthClientType.WEB))
                 .willReturn(SocialUserInfo.google("123456", "파봄"));
 
         OAuthLoginResult result = googleOAuthService.login(
