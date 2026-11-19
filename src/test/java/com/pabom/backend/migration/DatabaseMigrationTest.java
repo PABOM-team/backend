@@ -195,7 +195,7 @@ class DatabaseMigrationTest {
                 "uk_care_records_user_client_request",
                 "pk_care_record_revisions",
                 "fk_care_record_revisions_record",
-                "uk_care_records_routine_action_date",
+                "uk_care_records_routine_active_action_date",
                 "fk_care_records_guideline_version",
                 "pk_routine_postponement_events",
                 "fk_routine_postponement_events_routine"

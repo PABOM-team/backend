@@ -13,6 +13,7 @@ import com.pabom.backend.pet.infrastructure.persistence.PetJpaRepository;
 import com.pabom.backend.record.domain.entity.*;
 import com.pabom.backend.record.domain.error.*;
 import com.pabom.backend.record.domain.type.*;
+import com.pabom.backend.record.application.service.RecordService;
 import com.pabom.backend.record.infrastructure.persistence.*;
 import com.pabom.backend.user.domain.aggregate.User;
 import com.pabom.backend.user.infrastructure.persistence.UserJpaRepository;
@@ -30,6 +31,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class RoutineActionServiceIntegrationTest {
     @Autowired RoutineActionService service;
+    @Autowired RecordService recordService;
     @Autowired TodayQueryService todayService;
     @Autowired RoutineJpaRepository routines;
     @Autowired CareRecordJpaRepository records;
@@ -106,6 +108,63 @@ class RoutineActionServiceIntegrationTest {
     }
 
     @Test
+    void activeCompletionBlocksSkipOnTheSameDate() {
+        service.complete(owner.getId(), routine.getId(), completeRequest(today));
+
+        assertError(() -> service.skip(owner.getId(), routine.getId(),
+                new SkipRoutineRequest(UUID.randomUUID(), today, null, null)),
+                RoutineErrorCode.ROUTINE_ACTION_DUPLICATE);
+    }
+
+    @Test
+    void completedThenCancelledCanBeSkippedOnTheSameDate() {
+        replaceWithStartedRoutine();
+        RoutineActionResult completed = service.complete(owner.getId(), routine.getId(), completeRequest(today));
+
+        recordService.delete(owner.getId(), completed.record().id());
+
+        Routine cancelled = routines.findById(routine.getId()).orElseThrow();
+        assertThat(dueDates.toServiceDate(cancelled.getNextDueAt())).isEqualTo(today.minusDays(2));
+        assertThat(todayTask().status()).isEqualTo(TodayTaskStatus.OVERDUE);
+
+        RoutineActionResult skipped = service.skip(owner.getId(), routine.getId(),
+                new SkipRoutineRequest(UUID.randomUUID(), today, SkipReasonCode.SCHEDULE, null));
+
+        assertThat(skipped.routine().nextDueOn()).isEqualTo(today.plusDays(3));
+        assertThat(todayTask().status()).isEqualTo(TodayTaskStatus.SKIPPED);
+        assertThat(records.findAll()).hasSize(2);
+        assertThat(records.findById(completed.record().id()).orElseThrow().getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    void skippedThenCancelledCanBeCompletedOnTheSameDate() {
+        replaceWithStartedRoutine();
+        RoutineActionResult skipped = service.skip(owner.getId(), routine.getId(),
+                new SkipRoutineRequest(UUID.randomUUID(), today, null, null));
+
+        recordService.delete(owner.getId(), skipped.record().id());
+        RoutineActionResult completed = service.complete(owner.getId(), routine.getId(), completeRequest(today));
+
+        assertThat(completed.routine().lastDoneOn()).isEqualTo(today);
+        assertThat(completed.routine().nextDueOn()).isEqualTo(today.plusDays(3));
+        assertThat(todayTask().status()).isEqualTo(TodayTaskStatus.DONE);
+    }
+
+    @Test
+    void completedThenCancelledCanBeCompletedAgainOnTheSameDate() {
+        replaceWithStartedRoutine();
+        RoutineActionResult first = service.complete(owner.getId(), routine.getId(), completeRequest(today));
+
+        recordService.delete(owner.getId(), first.record().id());
+        RoutineActionResult second = service.complete(owner.getId(), routine.getId(), completeRequest(today));
+
+        assertThat(second.record().id()).isNotEqualTo(first.record().id());
+        assertThat(second.routine().lastDoneOn()).isEqualTo(today);
+        assertThat(second.routine().nextDueOn()).isEqualTo(today.plusDays(3));
+        assertThat(todayTask().status()).isEqualTo(TodayTaskStatus.DONE);
+    }
+
+    @Test
     void missingFeedingOutcomeIsStoredAsNeedsResult() {
         RoutineActionResult result = service.complete(owner.getId(), routine.getId(),
                 new CompleteRoutineRequest(UUID.randomUUID(), OffsetDateTime.ofInstant(
@@ -175,6 +234,27 @@ class RoutineActionServiceIntegrationTest {
         PostponeRoutineRequest request = new PostponeRoutineRequest();
         request.setPostponeTo(date);
         return request;
+    }
+
+    private CompleteRoutineRequest completeRequest(LocalDate date) {
+        return new CompleteRoutineRequest(UUID.randomUUID(), date.atTime(12, 0)
+                .atZone(ZoneId.of("Asia/Seoul")).toOffsetDateTime(), TimePrecision.DATE_ONLY,
+                FeedingOutcome.ATE_ALL, null, null, null);
+    }
+
+    private void replaceWithStartedRoutine() {
+        routines.deleteAll();
+        CareItem feeding = items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        LocalDate startDate = today.minusDays(2);
+        routine = routines.saveAndFlush(Routine.guideline(pet.getId(), feeding.getId(), 3, true,
+                null, startDate, dueDates.toDateOnlyInstant(startDate), clock.instant()));
+    }
+
+    private TodayResult.Task todayTask() {
+        return todayService.get(owner.getId(), pet.getId(), today).pets().stream()
+                .flatMap(group -> group.tasks().stream())
+                .filter(task -> task.routineId().equals(routine.getId()))
+                .findFirst().orElseThrow();
     }
 
     private void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action, Object code) {
