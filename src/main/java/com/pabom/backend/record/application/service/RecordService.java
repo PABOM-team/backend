@@ -31,6 +31,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -129,7 +130,7 @@ public class RecordService {
         boolean firstResult = record.getOutcome() == null && outcome != null;
         Instant now = clock.instant();
         record.edit(occurredAt, precision, outcome, value, json(detail), memo, photoId, now);
-        if (record.getActionDate() != null && records.existsByRoutineIdAndActionDateAndIdNot(
+        if (record.getActionDate() != null && records.existsByRoutineIdAndActionDateAndDeletedAtIsNullAndIdNot(
                 record.getRoutineId(), record.getActionDate(), record.getId()))
             throw error(RecordErrorCode.RECORD_CONFLICT);
         records.saveAndFlush(record);
@@ -170,7 +171,17 @@ public class RecordService {
         if (record.getDeletedAt().plus(RESTORE_WINDOW).isBefore(now)) throw error(RecordErrorCode.RESTORE_WINDOW_EXPIRED);
         Pet pet = ownedPetForUpdate(userId, record.getPetId());
         if (pet.getStatus() != PetStatus.ACTIVE) throw error(RecordErrorCode.PET_NOT_ACTIVE);
-        ObjectNode before = snapshot(record); record.restore(now); records.saveAndFlush(record); ObjectNode after = snapshot(record);
+        if (record.getActionDate() != null && records.existsByRoutineIdAndActionDateAndDeletedAtIsNullAndIdNot(
+                record.getRoutineId(), record.getActionDate(), record.getId()))
+            throw error(RecordErrorCode.RECORD_CONFLICT);
+        ObjectNode before = snapshot(record); record.restore(now);
+        try {
+            records.saveAndFlush(record);
+        } catch (DataIntegrityViolationException exception) {
+            if (record.getActionDate() != null) throw error(RecordErrorCode.RECORD_CONFLICT);
+            throw exception;
+        }
+        ObjectNode after = snapshot(record);
         revisions.save(CareRecordRevision.of(record.getId(), RevisionChangeType.RESTORE, "[\"deletedAt\"]",
                 json(before), json(after), now));
         Routine routine = record.getRoutineId() == null ? null : routines.findById(record.getRoutineId()).orElse(null);

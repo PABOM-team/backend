@@ -17,8 +17,9 @@ public interface CareRecordJpaRepository extends JpaRepository<CareRecord, Long>
 
     Optional<CareRecord> findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
             Long userId, Long routineId);
-    Optional<CareRecord> findByRoutineIdAndActionDate(Long routineId, LocalDate actionDate);
-    boolean existsByRoutineIdAndActionDateAndIdNot(Long routineId, LocalDate actionDate, Long id);
+    Optional<CareRecord> findByRoutineIdAndActionDateAndDeletedAtIsNull(Long routineId, LocalDate actionDate);
+    boolean existsByRoutineIdAndActionDateAndDeletedAtIsNullAndIdNot(
+            Long routineId, LocalDate actionDate, Long id);
     Optional<CareRecord> findFirstByUserIdAndRoutineIdAndRecordTypeAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(
             Long userId, Long routineId, RecordType recordType);
 

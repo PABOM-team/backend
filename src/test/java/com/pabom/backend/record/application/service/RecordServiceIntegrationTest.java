@@ -8,6 +8,7 @@ import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.careguideline.application.result.*;
 import com.pabom.backend.careguideline.application.service.*;
 import com.pabom.backend.careguideline.presentation.request.CompleteRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.SkipRoutineRequest;
 import com.pabom.backend.event.infrastructure.persistence.LoginEventJpaRepository;
 import com.pabom.backend.file.application.port.FileStoragePort;
 import com.pabom.backend.file.domain.entity.File;
@@ -145,6 +146,31 @@ class RecordServiceIntegrationTest {
         assertThat(task.status()).isEqualTo(TodayTaskStatus.OVERDUE);
         assertThat(task.dueDate()).isEqualTo(today.minusDays(2));
         assertThat(task.overdueDays()).isEqualTo(2);
+    }
+
+    @Test void restoringCancelledRoutineActionConflictsWithNewActiveActionAndKeepsHistory() {
+        CareItem feeding=items.findByCodeAndActiveTrue("FEEDING").orElseThrow();
+        ZoneId kst=ZoneId.of("Asia/Seoul"); LocalDate today=LocalDate.now(clock.withZone(kst));
+        Routine routine=routines.saveAndFlush(Routine.guideline(pet.getId(),feeding.getId(),3,true,null,today.minusDays(2),
+                today.minusDays(2).atTime(12,0).atZone(kst).toInstant(),clock.instant()));
+        RoutineActionResult completed=routineActions.complete(owner.getId(),routine.getId(),new CompleteRoutineRequest(
+                UUID.randomUUID(),today.atTime(12,0).atZone(kst).toOffsetDateTime(),TimePrecision.DATE_ONLY,
+                FeedingOutcome.ATE_ALL,null,null,null));
+        service.delete(owner.getId(),completed.record().id());
+        RoutineActionResult skipped=routineActions.skip(owner.getId(),routine.getId(),new SkipRoutineRequest(
+                UUID.randomUUID(),today,SkipReasonCode.SCHEDULE,null));
+
+        assertError(() -> service.restore(owner.getId(),completed.record().id()),RecordErrorCode.RECORD_CONFLICT);
+
+        CareRecord cancelled=records.findById(completed.record().id()).orElseThrow();
+        assertThat(cancelled.getDeletedAt()).isNotNull();
+        assertThat(revisions.findAllByCareRecordIdOrderByIdAsc(completed.record().id()))
+                .extracting(CareRecordRevision::getChangeType)
+                .containsExactly(RevisionChangeType.DELETE);
+        assertThat(todayTask(routine,today).status()).isEqualTo(TodayTaskStatus.SKIPPED);
+        assertThat(routines.findById(routine.getId()).orElseThrow().getNextDueAt())
+                .isEqualTo(today.plusDays(3).atTime(12,0).atZone(kst).toInstant());
+        assertThat(records.findById(skipped.record().id()).orElseThrow().getDeletedAt()).isNull();
     }
 
     @Test void todayFallsBackToStartDateWhenRoutineHasNoDueDateOrRecord() {

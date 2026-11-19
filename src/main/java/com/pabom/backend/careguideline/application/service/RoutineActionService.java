@@ -176,7 +176,7 @@ public class RoutineActionService {
         }).orElse(null);
     }
     private void rejectDuplicate(Long routineId, LocalDate date) {
-        if (records.findByRoutineIdAndActionDate(routineId, date).isPresent())
+        if (records.findByRoutineIdAndActionDateAndDeletedAtIsNull(routineId, date).isPresent())
             throw new BusinessException(RoutineErrorCode.ROUTINE_ACTION_DUPLICATE);
     }
     private CareRecord saveAction(CareRecord record) {
