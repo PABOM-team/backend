@@ -4,6 +4,9 @@ import com.pabom.backend.agreement.domain.repository.UserAgreementRepository;
 import com.pabom.backend.event.domain.repository.LoginEventRepository;
 import com.pabom.backend.file.application.port.FileStoragePort;
 import com.pabom.backend.file.domain.repository.FileRepository;
+import com.pabom.backend.notification.domain.repository.NotificationLogRepository;
+import com.pabom.backend.notification.domain.repository.NotificationSettingRepository;
+import com.pabom.backend.notification.domain.repository.PushTokenRepository;
 import com.pabom.backend.pet.domain.repository.PetRepository;
 import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaRepository;
 import com.pabom.backend.record.infrastructure.persistence.CareRecordRevisionJpaRepository;
@@ -39,6 +42,9 @@ public class WithdrawalCleanupService {
     private final UserAgreementRepository agreementRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final LoginEventRepository loginEventRepository;
+    private final PushTokenRepository pushTokenRepository;
+    private final NotificationSettingRepository notificationSettingRepository;
+    private final NotificationLogRepository notificationLogRepository;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -92,6 +98,9 @@ public class WithdrawalCleanupService {
                 agreementRepository.deleteAllByUserId(userId);
                 refreshTokenRepository.deleteAllByUserId(userId);
                 loginEventRepository.anonymizeByUserId(userId);
+                pushTokenRepository.deleteAllByUserId(userId);
+                notificationSettingRepository.deleteByUserId(userId);
+                notificationLogRepository.deleteAllByUserId(userId);
                 requiredJob(jobId).complete(clock.instant());
             });
         } catch (RuntimeException failure) {

@@ -42,6 +42,10 @@ app:
       region: ${AWS_REGION:ap-northeast-2}
       bucket: ${S3_BUCKET}
       presigned-url-expiration-seconds: ${S3_PRESIGNED_URL_EXPIRATION_SECONDS:600}
+  push:
+    expo:
+      # EAS 프로젝트 Access Token (push 보안 강화용). 비어 있으면 푸시를 보내지 않고 로그만 남긴다.
+      access-token: ${EXPO_ACCESS_TOKEN:}
 
 management:
   endpoints:

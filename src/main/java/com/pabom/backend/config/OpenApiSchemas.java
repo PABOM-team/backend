@@ -2,6 +2,8 @@ package com.pabom.backend.config;
 
 import com.pabom.backend.auth.presentation.response.OAuthLoginResponse;
 import com.pabom.backend.global.response.ResultType;
+import com.pabom.backend.notification.presentation.response.NotificationSettingResponse;
+import com.pabom.backend.notification.presentation.response.PushTestResponse;
 import com.pabom.backend.pet.presentation.response.PetResponse;
 import com.pabom.backend.pet.presentation.response.PetListResponse;
 import com.pabom.backend.species.presentation.response.MorphResponse;
@@ -151,6 +153,16 @@ public final class OpenApiSchemas {
 
     public record OAuthLoginSuccess(OAuthLoginResponse data) {
     }
+
+    @Schema(name = "NotificationSettingApiResponse")
+    public record NotificationSettingEnvelope(@Schema(example = "SUCCESS") ResultType resultType,
+            NotificationSettingSuccess success, @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record NotificationSettingSuccess(NotificationSettingResponse data) {}
+
+    @Schema(name = "PushTestApiResponse")
+    public record PushTestEnvelope(@Schema(example = "SUCCESS") ResultType resultType,
+            PushTestSuccess success, @Schema(nullable = true) ErrorData error, MetaData meta) {}
+    public record PushTestSuccess(PushTestResponse data) {}
 
     @Schema(name = "ErrorApiResponse")
     public record ErrorEnvelope(
