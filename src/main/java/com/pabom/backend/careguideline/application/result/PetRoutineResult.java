@@ -20,6 +20,7 @@ public record PetRoutineResult(
         LocalDate startDate,
         String guidelineVersion,
         String recordType,
+        String foodName,
         String description
 ) {
     public PetRoutineResult(Long routineId, Long petId, String careItemCode, String careItemName,
@@ -28,7 +29,7 @@ public record PetRoutineResult(
             OffsetDateTime nextDueAt, String guidelineVersion, String recordType, String description) {
         this(routineId, petId, careItemCode, careItemName, active, intervalDays, cycleSource,
                 defaultCycleDays, minDays, maxDays, isOutOfRange, nextDueAt, null,
-                guidelineVersion, recordType, description);
+                guidelineVersion, recordType, null, description);
     }
 }
 

@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 public record RoutinePostponeResult(RoutineState routine) {
+    @Schema(name = "RoutinePostponeState")
     public record RoutineState(Long id, @Schema(nullable = true) LocalDate nextDueOn,
             @Schema(nullable = true) LocalDate baseDueOn,
             @Schema(nullable = true) LocalDate postponedTo,

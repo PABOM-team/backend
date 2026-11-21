@@ -80,9 +80,27 @@ class RoutineControllerTest {
     }
 
     @Test
+    void includesNullableOriginalDueDateInTodayJson() throws Exception {
+        given(todayService.get(eq(7L), eq(null), eq(null))).willReturn(new TodayResult(
+                LocalDate.of(2026, 11, 21), new TodayResult.Summary(1, 0, 0, 0, 0, 0),
+                null, null, List.of(new TodayResult.PetTasks(1L, "레오", "레오파드 게코",
+                        null, null, List.of(new TodayResult.Task(10L, "FEED", "급여",
+                                com.pabom.backend.careguideline.application.result.TodayTaskStatus.DUE,
+                                LocalDate.of(2026, 11, 21), null, null, "FEED", null, null))))));
+
+        mvc.perform(get("/api/v1/today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success.data.pets[0].tasks[0].originalDueDate").value((Object) null));
+    }
+
+    @Test
     void validatesPatchAndDateFormats() throws Exception {
         mvc.perform(patch("/api/v1/routines/10").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"intervalDays\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mvc.perform(patch("/api/v1/routines/10").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"foodName\":\"123456789012345678901\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
         mvc.perform(patch("/api/v1/routines/10").contentType(MediaType.APPLICATION_JSON)

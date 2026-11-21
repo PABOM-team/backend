@@ -136,7 +136,8 @@ public class TodayQueryService {
             CareRecord last = todayRecord != null ? todayRecord : latestRecord;
             tasksByPet.computeIfAbsent(routine.getPetId(), ignored -> new ArrayList<>()).add(
                     new TodayResult.Task(routine.getId(), code, item.getName(), status, taskDueDate,
-                            overdueDays, item.getGuidelineRecordType(), item.getUnit(), lastRecord(last, item)));
+                            routine.getPostponedBaseDue(), overdueDays, item.getGuidelineRecordType(),
+                            item.getUnit(), lastRecord(last, item)));
         }
 
         Comparator<TodayResult.Task> taskOrder = Comparator

@@ -95,11 +95,12 @@ class PetControllerTest {
         given(routineQueryService.get(7L, 10L)).willReturn(List.of(new PetRoutineResult(
                 1L, 10L, "FEED", "급여", true, 3, CycleSource.GUIDELINE,
                 3, 2, 4, false, OffsetDateTime.parse("2026-11-04T12:00:00+09:00"),
-                "1.2", "FEED", "설명")));
+                LocalDate.of(2026, 11, 1), "1.2", "FEED", "귀뚜라미", "설명")));
 
         mockMvc.perform(get("/api/v1/pets/10/routines"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success.data[0].careItemCode").value("FEED"))
+                .andExpect(jsonPath("$.success.data[0].foodName").value("귀뚜라미"))
                 .andExpect(jsonPath("$.success.data[0].isOutOfRange").value(false));
     }
 

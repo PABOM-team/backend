@@ -35,6 +35,13 @@ class RoutineSwaggerTest {
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}'].patch.requestBody.content['application/json'].schema['$ref']").exists())
                 .andExpect(jsonPath("$.components.schemas.UpdateRoutineRequest.properties.reason.enum",
                         hasItems("BOTHERSOME", "MISMATCH", "SPECIAL_CONDITION", "PREFERENCE")))
+                .andExpect(jsonPath("$.components.schemas.UpdateRoutineRequest.properties.foodName.maxLength").value(20))
+                .andExpect(jsonPath("$.components.schemas.TodayTask.properties.originalDueDate.format").value("date"))
+                .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.id").exists())
+                .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.nextDueOn").exists())
+                .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.baseDueOn").exists())
+                .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.postponedTo").exists())
+                .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.postponedAt").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/routines/{routineId}/reset'].post.responses['404'].content['application/json'].examples.CARE_STANDARD_NOT_FOUND.value.error.code")
                         .value("CARE_STANDARD_NOT_FOUND"));
     }

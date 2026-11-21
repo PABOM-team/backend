@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record TodayResult(
         LocalDate date,
@@ -24,8 +25,9 @@ public record TodayResult(
 
     public record Photo(Long fileId) {}
 
+    @Schema(name = "TodayTask")
     public record Task(Long routineId, String itemCode, String itemName,
-            TodayTaskStatus status, LocalDate dueDate, Integer overdueDays,
+            TodayTaskStatus status, LocalDate dueDate, LocalDate originalDueDate, Integer overdueDays,
             String resultType, String unit, LastRecord lastRecord) {}
 
     public record LastRecord(Long recordId, RecordType recordType, OffsetDateTime occurredAt,
