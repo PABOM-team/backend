@@ -22,5 +22,6 @@ public record RoutineDetailsResult(
         Boolean isOutOfRange,
         RoutineModificationReason reason,
         String reasonNote,
-        OffsetDateTime modifiedAt
+        OffsetDateTime modifiedAt,
+        String foodName
 ) {}

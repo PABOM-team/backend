@@ -27,6 +27,7 @@ public class Routine {
     private RoutineModificationReason modificationReason;
     @Column(name = "modification_reason_note", length = 100) private String modificationReasonNote;
     @Column(name = "user_modified_at") private Instant userModifiedAt;
+    @Column(name = "food_name", length = 20) private String foodName;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
     protected Routine() {}
@@ -101,8 +102,10 @@ public class Routine {
         this.modificationReason = null;
         this.modificationReasonNote = null;
         this.userModifiedAt = null;
+        this.foodName = null;
         this.updatedAt = now;
     }
+    public void updateFoodName(String foodName) { this.foodName = foodName; }
     public Long getId() { return id; }
     public Long getPetId() { return petId; }
     public Long getCareItemId() { return careItemId; }
@@ -119,4 +122,5 @@ public class Routine {
     public RoutineModificationReason getModificationReason() { return modificationReason; }
     public String getModificationReasonNote() { return modificationReasonNote; }
     public Instant getUserModifiedAt() { return userModifiedAt; }
+    public String getFoodName() { return foodName; }
 }

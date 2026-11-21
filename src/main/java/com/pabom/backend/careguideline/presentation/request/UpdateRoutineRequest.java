@@ -21,6 +21,8 @@ public class UpdateRoutineRequest {
     private RoutineModificationReason reason;
     @Size(max = 100)
     private String reasonNote;
+    @Size(max = 20)
+    private String foodName;
     private final Set<String> present = new HashSet<>();
     private final Set<String> unknown = new HashSet<>();
 
@@ -34,6 +36,8 @@ public class UpdateRoutineRequest {
     @JsonSetter("reason") public void setReason(RoutineModificationReason value) { reason = value; present.add("reason"); }
     public String getReasonNote() { return reasonNote; }
     @JsonSetter("reasonNote") public void setReasonNote(String value) { reasonNote = value; present.add("reasonNote"); }
+    public String getFoodName() { return foodName; }
+    @JsonSetter("foodName") public void setFoodName(String value) { foodName = value; present.add("foodName"); }
     @JsonAnySetter public void unknown(String name, JsonNode ignored) { unknown.add(name); }
 
     @JsonIgnore public boolean has(String field) { return present.contains(field); }

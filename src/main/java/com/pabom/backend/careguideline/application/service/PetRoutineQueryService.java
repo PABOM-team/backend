@@ -98,6 +98,8 @@ public class PetRoutineQueryService {
                     routine.getStartDate(),
                     version == null ? null : version.getVersionLabel(),
                     standard == null ? item == null ? null : item.getGuidelineRecordType() : standard.getRecordType(),
+                    routine.getFoodName() != null ? routine.getFoodName()
+                            : standard == null ? null : standard.getDefaultFoodName(),
                     description);
         }).toList();
     }

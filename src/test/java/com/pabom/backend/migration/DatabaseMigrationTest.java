@@ -148,6 +148,16 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void addsNullableRoutineFoodNameColumn() {
+        var column = jdbcTemplate.queryForMap(
+                "SELECT character_maximum_length, is_nullable FROM information_schema.columns "
+                        + "WHERE table_schema='public' AND table_name='routines' AND column_name='food_name'");
+
+        assertThat(column.get("CHARACTER_MAXIMUM_LENGTH").toString()).isEqualTo("20");
+        assertThat(column.get("IS_NULLABLE").toString()).isEqualToIgnoringCase("yes");
+    }
+
+    @Test
     void createsDeclaredConstraintsAndIndexes() {
         List<String> constraints = jdbcTemplate.queryForList(
                 """

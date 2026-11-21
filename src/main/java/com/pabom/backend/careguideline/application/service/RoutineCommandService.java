@@ -61,6 +61,9 @@ public class RoutineCommandService {
 
         Context context = ownedContext(userId, routineId);
         Routine routine = context.routine();
+        if (request.has("foodName") && !"FEED".equals(context.item().getGuidelineRecordType())) {
+            throw new BusinessException(AuthErrorCode.VALIDATION_FAILED);
+        }
         Optional<CareRecord> lastRecord = records
                 .findFirstByUserIdAndRoutineIdAndDeletedAtIsNullOrderByOccurredAtDescIdDesc(userId, routineId);
         if (request.has("startDate") && lastRecord.isPresent()) {
@@ -112,8 +115,9 @@ public class RoutineCommandService {
                 request.has("isEnabled") ? enabled : null, startDate, customStartDate, nextDueAt,
                 intervalChanged, request.has("reason") ? request.getReason() : routine.getModificationReason(),
                 request.has("reasonNote") ? normalize(request.getReasonNote()) : routine.getModificationReasonNote(), now);
+        if (request.has("foodName")) routine.updateFoodName(normalize(request.getFoodName()));
         routines.save(routine);
-        return new RoutineMutationResult(details(context, routine, standardForStoredVersion(context, routine)), previous);
+        return new RoutineMutationResult(details(context, routine, standardForRoutine(context, routine)), previous);
     }
 
     @Transactional
@@ -159,11 +163,15 @@ public class RoutineCommandService {
         return new Context(routine, pet, item, code);
     }
 
-    private CareStandard standardForStoredVersion(Context context, Routine routine) {
-        if (routine.getCycleSource() == CycleSource.USER_CUSTOM || routine.getGuidelineVersionId() == null) return null;
+    private CareStandard standardForRoutine(Context context, Routine routine) {
+        Long versionId = routine.getGuidelineVersionId();
+        if (versionId == null) {
+            versionId = applicableGuidelines.findApplicable().map(CareGuidelineVersion::getId).orElse(null);
+        }
+        if (versionId == null) return null;
         LifeStage stage = applicableGuidelines.guidelineStage(context.pet().getLifeStageId());
         return standards.findByGuidelineVersionIdAndSpeciesIdAndLifeStageIdAndCareItemId(
-                routine.getGuidelineVersionId(), context.pet().getSpeciesId(), stage.getId(), context.item().getId())
+                versionId, context.pet().getSpeciesId(), stage.getId(), context.item().getId())
                 .orElse(null);
     }
 
@@ -179,7 +187,9 @@ public class RoutineCommandService {
         return new RoutineDetailsResult(routine.getId(), routine.getPetId(), context.code(), context.item().getName(),
                 routine.getIntervalDays(), routine.isActive(), routine.getCycleSource(), routine.getStartDate(),
                 offset(routine.getNextDueAt()), versionLabel, defaultDays, minDays, maxDays, outOfRange,
-                routine.getModificationReason(), routine.getModificationReasonNote(), offset(routine.getUserModifiedAt()));
+                routine.getModificationReason(), routine.getModificationReasonNote(), offset(routine.getUserModifiedAt()),
+                routine.getFoodName() != null ? routine.getFoodName()
+                        : standard == null ? null : standard.getDefaultFoodName());
     }
 
     private RoutineMutationResult.Previous previous(Routine routine) {

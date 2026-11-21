@@ -90,6 +90,7 @@ class RoutineActionServiceIntegrationTest {
         Routine stored = routines.findById(routine.getId()).orElseThrow();
         assertThat(stored.getPostponedBaseDue()).isNull();
         assertThat(stored.getPostponedAt()).isNull();
+        assertThat(todayTask().originalDueDate()).isNull();
         assertThat(records.count()).isEqualTo(1);
     }
 
@@ -131,7 +132,10 @@ class RoutineActionServiceIntegrationTest {
                 new SkipRoutineRequest(UUID.randomUUID(), today, SkipReasonCode.SCHEDULE, null));
 
         assertThat(skipped.routine().nextDueOn()).isEqualTo(today.plusDays(3));
-        assertThat(todayTask().status()).isEqualTo(TodayTaskStatus.SKIPPED);
+        assertThat(todayTask()).satisfies(task -> {
+            assertThat(task.status()).isEqualTo(TodayTaskStatus.SKIPPED);
+            assertThat(task.originalDueDate()).isNull();
+        });
         assertThat(records.findAll()).hasSize(2);
         assertThat(records.findById(completed.record().id()).orElseThrow().getDeletedAt()).isNotNull();
     }
@@ -183,10 +187,12 @@ class RoutineActionServiceIntegrationTest {
 
         service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(35)));
         RoutinePostponeResult second = service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(40)));
-        RoutinePostponeResult cancelled = service.postpone(owner.getId(), routine.getId(), postpone(null));
 
         assertThat(second.routine().baseDueOn()).isEqualTo(base);
         assertThat(second.routine().nextDueOn()).isEqualTo(today.plusDays(40));
+        assertThat(todayService.get(owner.getId(), pet.getId(), today.plusDays(40))
+                .pets().getFirst().tasks().getFirst().originalDueDate()).isEqualTo(base);
+        RoutinePostponeResult cancelled = service.postpone(owner.getId(), routine.getId(), postpone(null));
         assertThat(cancelled.routine().nextDueOn()).isEqualTo(base);
         assertThat(cancelled.routine().baseDueOn()).isNull();
         assertThat(postponements.findAllByRoutineIdOrderByIdAsc(routine.getId())).hasSize(3)
@@ -227,7 +233,10 @@ class RoutineActionServiceIntegrationTest {
         service.postpone(owner.getId(), routine.getId(), postpone(today));
         TodayResult postponed = todayService.get(owner.getId(), pet.getId(), today);
         assertThat(postponed.summary().dueCount()).isEqualTo(1);
-        assertThat(postponed.pets().getFirst().tasks().getFirst().status()).isEqualTo(TodayTaskStatus.DUE);
+        assertThat(postponed.pets().getFirst().tasks().getFirst()).satisfies(task -> {
+            assertThat(task.status()).isEqualTo(TodayTaskStatus.DUE);
+            assertThat(task.originalDueDate()).isEqualTo(today.minusDays(7));
+        });
     }
 
     private PostponeRoutineRequest postpone(LocalDate date) {

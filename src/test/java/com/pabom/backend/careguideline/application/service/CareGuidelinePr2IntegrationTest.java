@@ -455,6 +455,51 @@ class CareGuidelinePr2IntegrationTest {
     }
 
     @Test
+    void storesClearsAndResetsFoodNameWithoutChangingSchedule() {
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), stage("JUVENILE").getId(), Certainty.CONFIRMED));
+        Map<String, Routine> byCode = routinesByCode(pet.id());
+        Routine feed = byCode.get("FEED");
+        Instant due = feed.getNextDueAt();
+        int interval = feed.getIntervalDays();
+        CycleSource source = feed.getCycleSource();
+
+        UpdateRoutineRequest custom = new UpdateRoutineRequest();
+        custom.setFoodName("  밀웜  ");
+        assertThat(routineCommandService.update(owner.getId(), feed.getId(), custom).routine().foodName())
+                .isEqualTo("밀웜");
+        assertThat(routineQueryService.get(owner.getId(), pet.id()))
+                .filteredOn(result -> result.careItemCode().equals("FEED"))
+                .singleElement().extracting(PetRoutineResult::foodName).isEqualTo("밀웜");
+        Routine stored = routines.findById(feed.getId()).orElseThrow();
+        assertThat(stored.getIntervalDays()).isEqualTo(interval);
+        assertThat(stored.getNextDueAt()).isEqualTo(due);
+        assertThat(stored.getCycleSource()).isEqualTo(source);
+
+        UpdateRoutineRequest omitted = new UpdateRoutineRequest();
+        omitted.setReasonNote("유지 확인");
+        assertThat(routineCommandService.update(owner.getId(), feed.getId(), omitted).routine().foodName())
+                .isEqualTo("밀웜");
+
+        UpdateRoutineRequest clear = new UpdateRoutineRequest();
+        clear.setFoodName(null);
+        assertThat(routineCommandService.update(owner.getId(), feed.getId(), clear).routine().foodName())
+                .isEqualTo("귀뚜라미");
+
+        custom.setFoodName("슈퍼밀웜");
+        routineCommandService.update(owner.getId(), feed.getId(), custom);
+        assertThat(routineCommandService.reset(owner.getId(), feed.getId()).routine().foodName())
+                .isEqualTo("귀뚜라미");
+
+        UpdateRoutineRequest nonFeed = new UpdateRoutineRequest();
+        nonFeed.setFoodName("금지");
+        assertError(() -> routineCommandService.update(owner.getId(), byCode.get("WATER").getId(), nonFeed),
+                com.pabom.backend.auth.domain.error.AuthErrorCode.VALIDATION_FAILED);
+        assertError(() -> routineCommandService.update(other.getId(), feed.getId(), custom),
+                RoutineErrorCode.ROUTINE_NOT_FOUND);
+    }
+
+    @Test
     void recalculatesFromLastRecordLocksStartDateAndResetsToCurrentGuideline() {
         PetResult pet = petCommandService.create(owner.getId(), command(UUID.randomUUID(), null, Certainty.UNKNOWN));
         Routine feed = routinesByCode(pet.id()).get("FEED");
