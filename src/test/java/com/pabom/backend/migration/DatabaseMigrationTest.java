@@ -236,6 +236,34 @@ class DatabaseMigrationTest {
     }
 
     @Test
+    void createsPushNotificationTablesWithDuplicatePreventionKeys() {
+        List<String> tables = jdbcTemplate.queryForList(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",
+                String.class);
+        List<String> constraints = jdbcTemplate.queryForList(
+                "SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema = 'public'",
+                String.class);
+        List<String> indexes = jdbcTemplate.queryForList(
+                "SELECT index_name FROM information_schema.indexes WHERE table_schema = 'public'",
+                String.class);
+
+        assertThat(tables).contains("push_tokens", "notification_settings", "notification_logs", "push_tickets");
+        assertThat(constraints).contains(
+                "pk_push_tokens",
+                "uk_push_tokens_token",
+                "fk_push_tokens_user",
+                "pk_notification_settings",
+                "fk_notification_settings_user",
+                "pk_notification_logs",
+                "uk_notification_logs_user_type_date",
+                "fk_notification_logs_user",
+                "pk_push_tickets",
+                "uk_push_tickets_ticket_id"
+        );
+        assertThat(indexes).contains("idx_push_tokens_user_id", "idx_push_tickets_created_at");
+    }
+
+    @Test
     void doesNotRunVersionedMigrationTwice() {
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }

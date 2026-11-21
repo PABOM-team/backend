@@ -58,7 +58,15 @@ public class TodayQueryService {
     private final Environment environment;
 
     public TodayResult get(Long userId, Long petId, LocalDate requestedDate) {
-        LocalDate date = resolveDate(requestedDate);
+        return build(userId, petId, resolveDate(requestedDate));
+    }
+
+    /** 서버 내부(케어 알림 발송)용. 프로필과 관계없이 지정한 날짜 기준으로 조회한다. */
+    public TodayResult getForDate(Long userId, LocalDate date) {
+        return build(userId, null, date);
+    }
+
+    private TodayResult build(Long userId, Long petId, LocalDate date) {
         List<Pet> ownedPets = ownedActivePets(userId, petId);
         if (ownedPets.isEmpty()) return empty(date, TodayEmptyReason.NO_PETS);
 

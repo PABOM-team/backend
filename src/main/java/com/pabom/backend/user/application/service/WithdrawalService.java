@@ -2,6 +2,7 @@ package com.pabom.backend.user.application.service;
 
 import com.pabom.backend.auth.domain.error.AuthErrorCode;
 import com.pabom.backend.global.error.BusinessException;
+import com.pabom.backend.notification.domain.repository.PushTokenRepository;
 import com.pabom.backend.user.domain.aggregate.User;
 import com.pabom.backend.user.domain.entity.WithdrawalCleanupJob;
 import com.pabom.backend.user.domain.repository.RefreshTokenRepository;
@@ -20,6 +21,7 @@ public class WithdrawalService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final WithdrawalCleanupJobJpaRepository cleanupJobRepository;
+    private final PushTokenRepository pushTokenRepository;
     private final Clock clock;
 
     @Transactional
@@ -34,6 +36,8 @@ public class WithdrawalService {
         user.withdraw(now);
         userRepository.save(user);
         refreshTokenRepository.revokeAllByUserId(userId, now);
+        // 탈퇴 즉시 푸시가 나가지 않도록 기기 토큰은 정리 작업을 기다리지 않고 바로 지운다.
+        pushTokenRepository.deleteAllByUserId(userId);
         cleanupJobRepository.save(WithdrawalCleanupJob.pending(userId, now));
     }
 }
