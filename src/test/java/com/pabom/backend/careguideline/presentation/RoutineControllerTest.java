@@ -86,7 +86,8 @@ class RoutineControllerTest {
                 null, null, List.of(new TodayResult.PetTasks(1L, "레오", "레오파드 게코",
                         null, null, List.of(new TodayResult.Task(10L, "FEED", "급여",
                                 com.pabom.backend.careguideline.application.result.TodayTaskStatus.DUE,
-                                LocalDate.of(2026, 11, 21), null, null, "FEED", null, null))))));
+                                LocalDate.of(2026, 11, 21), null, null, "FEED", null,
+                                "귀뚜라미", null))))));
 
         mvc.perform(get("/api/v1/today"))
                 .andExpect(status().isOk())

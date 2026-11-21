@@ -43,6 +43,7 @@ class RoutineSwaggerTest {
                         hasItems("BOTHERSOME", "MISMATCH", "SPECIAL_CONDITION", "PREFERENCE")))
                 .andExpect(jsonPath("$.components.schemas.UpdateRoutineRequest.properties.foodName.maxLength").value(20))
                 .andExpect(jsonPath("$.components.schemas.TodayTask.properties.originalDueDate.format").value("date"))
+                .andExpect(jsonPath("$.components.schemas.TodayTask.properties.foodName").exists())
                 .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.id").exists())
                 .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.nextDueOn").exists())
                 .andExpect(jsonPath("$.components.schemas.RoutinePostponeState.properties.baseDueOn").exists())

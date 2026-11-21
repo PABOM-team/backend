@@ -25,8 +25,11 @@ class RecordSwaggerTest {
           .andExpect(jsonPath("$.paths['/api/v1/records'].post.requestBody.content['application/json'].examples['직접 기록 추가'].value.clientRequestId").value("a1b2c3d4-e5f6-47a8-9012-123456789abc"))
           .andExpect(jsonPath("$.paths['/api/v1/records'].post.responses['201'].content['application/json'].examples['일정 없음'].value.success.data.routineUpdated").doesNotExist())
           .andExpect(jsonPath("$.components.schemas.CreateRecordRequest.required",hasItems("clientRequestId","petId","itemCode","occurredAt")))
+          .andExpect(jsonPath("$.components.schemas.CreateRecordRequest.properties.memo.maxLength").value(200))
+          .andExpect(jsonPath("$.components.schemas.UpdateRecordRequest.properties.memo.maxLength").value(200))
           .andExpect(jsonPath("$.components.schemas.CreateRecordRequest.properties.outcome.enum",hasItems("ATE_ALL","ATE_PART","REFUSED","NOT_OBSERVED","EATING_TRACE_FOUND","EATING_TRACE_NOT_FOUND")))
           .andExpect(jsonPath("$.paths['/api/v1/records'].post.requestBody.content['application/json'].examples['직접 기록 추가'].value.outcome").value("EATING_TRACE_FOUND"))
+          .andExpect(jsonPath("$.paths['/api/v1/records'].post.requestBody.content['application/json'].examples['직접 기록 추가'].value.detail.foodName").value("인공 사료"))
           .andExpect(jsonPath("$.paths['/api/v1/records'].get.responses['200'].content['application/json'].examples['목록'].value.success.data.items[0].detailSummary").value("먹은 흔적 있음"))
           .andExpect(jsonPath("$.paths['/api/v1/records/{recordId}'].get.responses['200'].content['application/json'].examples['기록 상세 및 정정 이력'].value.success.data.revisions[0].before.outcome").value("EATING_TRACE_FOUND"));
           
