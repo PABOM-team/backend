@@ -21,6 +21,27 @@ public final class RoutineOpenApiExamples {
     public static final String COMPLETE_SUCCESS = """
             {"resultType":"SUCCESS","success":{"data":{"record":{"id":902,"recordType":"DONE","itemCode":"FEED","occurredAt":"2026-11-02T12:00:00+09:00","timePrecision":"EXACT","outcome":"EATING_TRACE_FOUND","valueNum":null,"unit":null,"reasonCode":null,"memo":"인공 사료에서 먹은 흔적을 확인했어요."},"routine":{"id":10,"lastDoneOn":"2026-11-02","nextDueOn":"2026-11-04"},"todayStatus":"DONE"}},"error":null,"meta":{"timestamp":"2026-11-02T03:00:00","path":"/api/v1/routines/10/complete"}}
             """;
+    public static final String POSTPONE_REQUEST = """
+            {"postponeTo":"2026-11-25"}
+            """;
+    public static final String POSTPONE_CANCEL_REQUEST = """
+            {"postponeTo":null}
+            """;
+    public static final String POSTPONE_SUCCESS = """
+            {"resultType":"SUCCESS","success":{"data":{"routine":{"id":1,"nextDueOn":"2026-11-25","baseDueOn":"2026-11-21","postponedTo":"2026-11-25","postponedAt":"2026-11-21T12:00:00+09:00"}}},"error":null,"meta":{"timestamp":"2026-11-21T03:00:00","path":"/api/v1/routines/1/postpone"}}
+            """;
+    public static final String POSTPONE_DATE_INVALID_REQUEST = """
+            {"postponeTo":"2026-12-21"}
+            """;
+    public static final String POSTPONE_DATE_INVALID = """
+            {"resultType":"FAIL","success":null,"error":{"code":"POSTPONE_DATE_INVALID","message":"미룰 날짜는 내일부터 29일 이내이며, 현재 예정일보다 뒤여야 합니다.","details":null},"meta":{"timestamp":"2026-11-21T03:00:00","path":"/api/v1/routines/1/postpone"}}
+            """;
+    public static final String POSTPONEMENT_NOT_FOUND = """
+            {"resultType":"FAIL","success":null,"error":{"code":"POSTPONEMENT_NOT_FOUND","message":"취소할 미루기가 없습니다.","details":null},"meta":{"timestamp":"2026-11-21T03:00:00","path":"/api/v1/routines/1/postpone"}}
+            """;
+    public static final String POSTPONEMENT_CYCLE_COMPLETED = """
+            {"resultType":"FAIL","success":null,"error":{"code":"POSTPONEMENT_CYCLE_COMPLETED","message":"완료된 회차의 미루기는 취소할 수 없습니다.","details":null},"meta":{"timestamp":"2026-11-21T03:00:00","path":"/api/v1/routines/1/postpone"}}
+            """;
     public static final String COMPLETE_OUTCOME_NOT_ALLOWED = "{\"resultType\":\"FAIL\",\"success\":null,\"error\":{\"code\":\"OUTCOME_NOT_ALLOWED\",\"message\":\"해당 종 및 급여 유형에서 허용되지 않는 급여 결과입니다.\",\"details\":null},\"meta\":{\"timestamp\":\"2026-11-02T03:00:00\",\"path\":\"/api/v1/routines/10/complete\"}}";
     public static final String CLIENT_REQUEST_ID_REUSED = "{\"resultType\":\"FAIL\",\"success\":null,\"error\":{\"code\":\"CLIENT_REQUEST_ID_REUSED\",\"message\":\"동일한 clientRequestId가 다른 요청에 사용되었습니다.\",\"details\":null},\"meta\":{\"timestamp\":\"2026-11-02T03:00:00\",\"path\":\"/api/v1/routines/10/complete\"}}";
     public static final String ROUTINE_NOT_ACTIVE = "{\"resultType\":\"FAIL\",\"success\":null,\"error\":{\"code\":\"ROUTINE_NOT_ACTIVE\",\"message\":\"비활성 루틴은 처리할 수 없습니다.\",\"details\":null},\"meta\":{\"timestamp\":\"2026-11-02T03:00:00\",\"path\":\"/api/v1/routines/10/complete\"}}";

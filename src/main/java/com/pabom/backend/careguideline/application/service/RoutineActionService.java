@@ -135,12 +135,15 @@ public class RoutineActionService {
             return postponeResult(routine);
         }
 
-        if (currentDue == null || !request.getPostponeTo().isAfter(currentDue))
+        LocalDate today = LocalDate.now(clock.withZone(KST));
+        LocalDate postponeTo = request.getPostponeTo();
+        if (!postponeTo.isAfter(today) || !postponeTo.isBefore(today.plusDays(30))
+                || currentDue == null || !postponeTo.isAfter(currentDue))
             throw new BusinessException(RoutineErrorCode.POSTPONE_DATE_INVALID);
         LocalDate base = routine.getPostponedBaseDue() == null ? currentDue : routine.getPostponedBaseDue();
-        postponements.save(RoutinePostponementEvent.of(routineId, currentDue, request.getPostponeTo(),
+        postponements.save(RoutinePostponementEvent.of(routineId, currentDue, postponeTo,
                 base, PostponementEventType.POSTPONED, now));
-        routine.postpone(base, dueDates.toDateOnlyInstant(request.getPostponeTo()), now);
+        routine.postpone(base, dueDates.toDateOnlyInstant(postponeTo), now);
         routines.save(routine);
         return postponeResult(routine);
     }

@@ -21,7 +21,11 @@ import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest(properties = {
@@ -29,7 +33,10 @@ import org.springframework.test.context.ActiveProfiles;
         "spring.jpa.hibernate.ddl-auto=validate", "spring.flyway.enabled=true"
 })
 @ActiveProfiles("test")
+@Import(RoutineActionServiceIntegrationTest.FixedClockConfig.class)
 class RoutineActionServiceIntegrationTest {
+    private static final Instant FIXED_NOW = Instant.parse("2026-11-21T03:00:00Z");
+
     @Autowired RoutineActionService service;
     @Autowired RecordService recordService;
     @Autowired TodayQueryService todayService;
@@ -42,6 +49,7 @@ class RoutineActionServiceIntegrationTest {
     @Autowired LoginEventJpaRepository loginEvents;
     @Autowired RoutineDueDateCalculator dueDates;
     @Autowired Clock clock;
+    @Autowired AdjustableClock adjustableClock;
 
     private User owner;
     private User other;
@@ -51,6 +59,7 @@ class RoutineActionServiceIntegrationTest {
 
     @BeforeEach
     void setup() {
+        adjustableClock.setInstant(FIXED_NOW);
         postponements.deleteAll();
         records.deleteAll();
         routines.deleteAll();
@@ -185,12 +194,12 @@ class RoutineActionServiceIntegrationTest {
         CycleSource source = routine.getCycleSource();
         LocalDate base = today.minusDays(2);
 
-        service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(35)));
-        RoutinePostponeResult second = service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(40)));
+        service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(10)));
+        RoutinePostponeResult second = service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(20)));
 
         assertThat(second.routine().baseDueOn()).isEqualTo(base);
-        assertThat(second.routine().nextDueOn()).isEqualTo(today.plusDays(40));
-        assertThat(todayService.get(owner.getId(), pet.getId(), today.plusDays(40))
+        assertThat(second.routine().nextDueOn()).isEqualTo(today.plusDays(20));
+        assertThat(todayService.get(owner.getId(), pet.getId(), today.plusDays(20))
                 .pets().getFirst().tasks().getFirst().originalDueDate()).isEqualTo(base);
         RoutinePostponeResult cancelled = service.postpone(owner.getId(), routine.getId(), postpone(null));
         assertThat(cancelled.routine().nextDueOn()).isEqualTo(base);
@@ -207,10 +216,75 @@ class RoutineActionServiceIntegrationTest {
     @Test
     void blocksPostponementCancellationAfterOccurrenceFinishesCycle() {
         service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(2)));
+        adjustableClock.advance(Duration.ofSeconds(1));
         service.skip(owner.getId(), routine.getId(), new SkipRoutineRequest(UUID.randomUUID(), today, null, null));
 
         assertError(() -> service.postpone(owner.getId(), routine.getId(), postpone(null)),
                 RoutineErrorCode.POSTPONEMENT_CYCLE_COMPLETED);
+    }
+
+    @Test
+    void rejectsPostponementToTodayWithoutChangingRoutineOrHistory() {
+        assertInvalidPostponeWithoutChanges(today);
+    }
+
+    @Test
+    void rejectsPostponementToPastDateWithoutChangingRoutineOrHistory() {
+        assertInvalidPostponeWithoutChanges(today.minusDays(1));
+    }
+
+    @Test
+    void postponesToTomorrow() {
+        RoutinePostponeResult result = service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(1)));
+
+        assertThat(result.routine().nextDueOn()).isEqualTo(today.plusDays(1));
+        assertThat(postponements.findAllByRoutineIdOrderByIdAsc(routine.getId())).hasSize(1);
+    }
+
+    @Test
+    void postponesToTwentyNineDaysAfterToday() {
+        RoutinePostponeResult result = service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(29)));
+
+        assertThat(result.routine().nextDueOn()).isEqualTo(today.plusDays(29));
+    }
+
+    @Test
+    void rejectsPostponementToThirtyDaysAfterTodayWithoutChangingRoutineOrHistory() {
+        assertInvalidPostponeWithoutChanges(today.plusDays(30));
+    }
+
+    @Test
+    void rejectsPostponementToThirtyOneDaysAfterTodayWithoutChangingRoutineOrHistory() {
+        assertInvalidPostponeWithoutChanges(today.plusDays(31));
+    }
+
+    @Test
+    void rejectsPostponementToCurrentDueDate() {
+        updateCurrentDue(today.plusDays(5));
+
+        assertInvalidPostponeWithoutChanges(today.plusDays(5));
+    }
+
+    @Test
+    void rejectsPostponementBeforeCurrentDueDate() {
+        updateCurrentDue(today.plusDays(5));
+
+        assertInvalidPostponeWithoutChanges(today.plusDays(1));
+    }
+
+    @Test
+    void appliesDateRangeValidationToRepeatedPostponement() {
+        service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(10)));
+        LocalDate dueBeforeFailure = dueDates.toServiceDate(
+                routines.findById(routine.getId()).orElseThrow().getNextDueAt());
+        long historyCountBeforeFailure = postponements.count();
+
+        assertError(() -> service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(30))),
+                RoutineErrorCode.POSTPONE_DATE_INVALID);
+
+        assertThat(dueDates.toServiceDate(routines.findById(routine.getId()).orElseThrow().getNextDueAt()))
+                .isEqualTo(dueBeforeFailure);
+        assertThat(postponements.count()).isEqualTo(historyCountBeforeFailure);
     }
 
     @Test
@@ -230,8 +304,8 @@ class RoutineActionServiceIntegrationTest {
         assertThat(routines.findById(routine.getId()).orElseThrow().getNextDueAt())
                 .isEqualTo(dueDates.toDateOnlyInstant(today.minusDays(7)));
 
-        service.postpone(owner.getId(), routine.getId(), postpone(today));
-        TodayResult postponed = todayService.get(owner.getId(), pet.getId(), today);
+        service.postpone(owner.getId(), routine.getId(), postpone(today.plusDays(1)));
+        TodayResult postponed = todayService.get(owner.getId(), pet.getId(), today.plusDays(1));
         assertThat(postponed.summary().dueCount()).isEqualTo(1);
         assertThat(postponed.pets().getFirst().tasks().getFirst()).satisfies(task -> {
             assertThat(task.status()).isEqualTo(TodayTaskStatus.DUE);
@@ -243,6 +317,27 @@ class RoutineActionServiceIntegrationTest {
         PostponeRoutineRequest request = new PostponeRoutineRequest();
         request.setPostponeTo(date);
         return request;
+    }
+
+    private void assertInvalidPostponeWithoutChanges(LocalDate postponeTo) {
+        Routine before = routines.findById(routine.getId()).orElseThrow();
+        Instant nextDueBefore = before.getNextDueAt();
+        LocalDate baseDueBefore = before.getPostponedBaseDue();
+        long historyCountBefore = postponements.count();
+
+        assertError(() -> service.postpone(owner.getId(), routine.getId(), postpone(postponeTo)),
+                RoutineErrorCode.POSTPONE_DATE_INVALID);
+
+        Routine after = routines.findById(routine.getId()).orElseThrow();
+        assertThat(after.getNextDueAt()).isEqualTo(nextDueBefore);
+        assertThat(after.getPostponedBaseDue()).isEqualTo(baseDueBefore);
+        assertThat(postponements.count()).isEqualTo(historyCountBefore);
+    }
+
+    private void updateCurrentDue(LocalDate currentDue) {
+        Routine stored = routines.findById(routine.getId()).orElseThrow();
+        stored.updateNextDueAt(dueDates.toDateOnlyInstant(currentDue), clock.instant());
+        routine = routines.saveAndFlush(stored);
     }
 
     private CompleteRoutineRequest completeRequest(LocalDate date) {
@@ -269,5 +364,45 @@ class RoutineActionServiceIntegrationTest {
     private void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action, Object code) {
         assertThatThrownBy(action).isInstanceOfSatisfying(BusinessException.class,
                 exception -> assertThat(exception.errorCode()).isEqualTo(code));
+    }
+
+    @TestConfiguration
+    static class FixedClockConfig {
+        @Bean
+        @Primary
+        AdjustableClock fixedClock() {
+            return new AdjustableClock(FIXED_NOW, ZoneOffset.UTC);
+        }
+    }
+
+    static class AdjustableClock extends Clock {
+        private Clock delegate;
+
+        AdjustableClock(Instant instant, ZoneId zone) {
+            delegate = Clock.fixed(instant, zone);
+        }
+
+        void setInstant(Instant instant) {
+            delegate = Clock.fixed(instant, delegate.getZone());
+        }
+
+        void advance(Duration duration) {
+            delegate = Clock.offset(delegate, duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return delegate.getZone();
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return delegate.withZone(zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return delegate.instant();
+        }
     }
 }

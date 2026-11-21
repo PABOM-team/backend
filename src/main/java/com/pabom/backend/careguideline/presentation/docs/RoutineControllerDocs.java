@@ -83,14 +83,25 @@ public interface RoutineControllerDocs {
     ResponseEntity<ApiResponseBody<RoutineActionResult>> skip(Long routineId, AuthUser authUser,
             SkipRoutineRequest body, HttpServletRequest request);
 
-    @Operation(summary = "루틴 미루기 또는 취소", security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION))
+    @Operation(summary = "루틴 미루기 또는 취소",
+            description = "일반 미루기의 postponeTo는 Asia/Seoul 기준 오늘보다 뒤, 오늘로부터 30일 미만, 현재 예정일보다 뒤인 날짜여야 합니다. postponeTo가 null이면 기존 미루기를 취소하고 최초 예정일로 복원합니다.",
+            security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+                    content = @Content(schema = @Schema(implementation = PostponeRoutineRequest.class), examples = {
+                            @ExampleObject(name = "정상 미루기", value = POSTPONE_REQUEST),
+                            @ExampleObject(name = "날짜 범위 위반", value = POSTPONE_DATE_INVALID_REQUEST),
+                            @ExampleObject(name = "미루기 취소", value = POSTPONE_CANCEL_REQUEST)
+                    })))
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "미루기 변경 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutinePostponeEnvelope.class))),
+            @ApiResponse(responseCode = "200", description = "미루기 변경 성공", content = @Content(schema = @Schema(implementation = OpenApiSchemas.RoutinePostponeEnvelope.class), examples = @ExampleObject(name = "정상 미루기", value = POSTPONE_SUCCESS))),
             @ApiResponse(responseCode = "400", description = "요청 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
             @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
             @ApiResponse(responseCode = "404", description = "루틴 없음", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
-            @ApiResponse(responseCode = "409", description = "취소 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class))),
-            @ApiResponse(responseCode = "422", description = "미루기 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class)))
+            @ApiResponse(responseCode = "409", description = "취소 또는 상태 충돌", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = {
+                    @ExampleObject(name = "POSTPONEMENT_NOT_FOUND", value = POSTPONEMENT_NOT_FOUND),
+                    @ExampleObject(name = "POSTPONEMENT_CYCLE_COMPLETED", value = POSTPONEMENT_CYCLE_COMPLETED)
+            })),
+            @ApiResponse(responseCode = "422", description = "미루기 날짜 검증 실패", content = @Content(schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class), examples = @ExampleObject(name = "POSTPONE_DATE_INVALID", value = POSTPONE_DATE_INVALID)))
     })
     ResponseEntity<ApiResponseBody<RoutinePostponeResult>> postpone(Long routineId, AuthUser authUser,
             PostponeRoutineRequest body, HttpServletRequest request);
