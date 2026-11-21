@@ -111,6 +111,19 @@ class RoutineControllerTest {
     }
 
     @Test
+    void returnsPostponeDateInvalidAsUnprocessableEntityWithDateRangeMessage() throws Exception {
+        given(actionService.postpone(eq(7L), eq(10L), any()))
+                .willThrow(new BusinessException(RoutineErrorCode.POSTPONE_DATE_INVALID));
+
+        mvc.perform(post("/api/v1/routines/10/postpone").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"postponeTo\":\"2026-12-21\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("POSTPONE_DATE_INVALID"))
+                .andExpect(jsonPath("$.error.message").value(
+                        "미룰 날짜는 내일부터 29일 이내이며, 현재 예정일보다 뒤여야 합니다."));
+    }
+
+    @Test
     void hidesOtherUsersRoutineAndRequiresAuthentication() throws Exception {
         given(commandService.reset(7L, 99L)).willThrow(new BusinessException(RoutineErrorCode.ROUTINE_NOT_FOUND));
         mvc.perform(post("/api/v1/routines/99/reset"))
