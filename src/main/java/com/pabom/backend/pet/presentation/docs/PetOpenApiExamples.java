@@ -10,7 +10,7 @@ public final class PetOpenApiExamples {
             """;
 
     public static final String UPDATE_REQUEST = """
-            {"name":"콩콩이","morphIds":[3],"customMorph":null,"adoptedAt":null,"sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null}
+            {"lifeStageId":3,"stageCertainty":"CONFIRMED"}
             """;
 
     public static final String CREATE_SUCCESS = """
@@ -26,7 +26,17 @@ public final class PetOpenApiExamples {
             """;
 
     public static final String UPDATE_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩콩이","morphs":[{"id":3,"code":"FLAME","name":"플레임"}],"customMorph":null,"hatchedAt":null,"adoptedAt":null,"lifeStageId":2,"stageCertainty":"CONFIRMED","sex":"UNKNOWN","sexCertainty":"UNKNOWN","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T08:10:00.000Z"}},"error":null,"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
+            {"resultType":"SUCCESS","success":{"data":{"id":12,"speciesId":1,"name":"콩이","morphs":[{"id":2,"code":"HARLEQUIN","name":"할리퀸"}],"customMorph":null,"hatchedAt":"2026-03-02","adoptedAt":"2026-04-10","lifeStageId":3,"stageCertainty":"CONFIRMED","sex":"FEMALE","sexCertainty":"ESTIMATED","photoFileId":null,"createdAt":"2026-10-18T07:52:18.222Z","updatedAt":"2026-10-18T08:10:00.000Z"}},"error":null,"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
+            """;
+
+    public static final String APPLICABLE_GUIDELINE_NOT_FOUND = """
+            {"resultType":"FAIL","success":null,"error":{"code":"APPLICABLE_GUIDELINE_NOT_FOUND","message":"현재 적용 가능한 게시 가이드라인이 없습니다.","details":null},"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
+            """;
+    public static final String GUIDELINE_VERSION_CONFLICT = """
+            {"resultType":"FAIL","success":null,"error":{"code":"GUIDELINE_VERSION_CONFLICT","message":"동일 적용일의 게시 가이드라인이 여러 개입니다.","details":null},"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
+            """;
+    public static final String CARE_STANDARD_DATA_MISSING = """
+            {"resultType":"FAIL","success":null,"error":{"code":"CARE_STANDARD_DATA_MISSING","message":"가이드라인 관리 기준 데이터가 누락되었습니다.","details":null},"meta":{"timestamp":"2026-10-18T08:10:00.000","path":"/api/v1/pets/12"}}
             """;
 
     public static final String VALIDATION_FAILED = """

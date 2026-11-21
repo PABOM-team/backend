@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,6 +94,7 @@ public class PetCommandService {
     public PetResult update(Long userId, Long petId, UpdatePetCommand command) {
         Pet pet = petRepository.findActiveByIdAndUserIdForUpdate(petId, userId)
                 .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+        Long previousLifeStageId = pet.getLifeStageId();
 
         List<Morph> finalMorphs = pet.getMorphs();
         if (command.morphIds().present()) {
@@ -149,7 +151,11 @@ public class PetCommandService {
             validator.validatePhoto(command.photoFileId().value(), userId);
             pet.updatePhotoFileId(command.photoFileId().value(), now);
         }
-        return PetResult.from(petRepository.save(pet));
+        Pet saved = petRepository.save(pet);
+        if (!Objects.equals(previousLifeStageId, saved.getLifeStageId())) {
+            initialRoutineCreationService.synchronizeForLifeStageChange(saved, now);
+        }
+        return PetResult.from(saved);
     }
 
     private Certainty defaultCertainty(Certainty certainty) {

@@ -9,10 +9,14 @@ import com.pabom.backend.careguideline.application.result.TodayEmptyReason;
 import com.pabom.backend.careguideline.application.result.TodayTaskStatus;
 import com.pabom.backend.careguideline.domain.type.CareGuidelineImportMode;
 import com.pabom.backend.careguideline.domain.entity.CareGuidelineVersion;
+import com.pabom.backend.careguideline.domain.entity.CareStandard;
 import com.pabom.backend.careguideline.domain.error.CareGuidelineQueryErrorCode;
 import com.pabom.backend.careguideline.infrastructure.persistence.CareGuidelineVersionJpaRepository;
+import com.pabom.backend.careguideline.infrastructure.persistence.CareStandardJpaRepository;
 import com.pabom.backend.global.error.BusinessException;
 import com.pabom.backend.pet.application.command.CreatePetCommand;
+import com.pabom.backend.pet.application.command.PatchValue;
+import com.pabom.backend.pet.application.command.UpdatePetCommand;
 import com.pabom.backend.pet.application.result.PetResult;
 import com.pabom.backend.pet.application.service.PetCommandService;
 import com.pabom.backend.pet.domain.error.PetErrorCode;
@@ -29,6 +33,7 @@ import com.pabom.backend.record.infrastructure.persistence.CareItemJpaRepository
 import com.pabom.backend.record.infrastructure.persistence.CareRecordJpaRepository;
 import com.pabom.backend.record.infrastructure.persistence.RoutineJpaRepository;
 import com.pabom.backend.careguideline.presentation.request.UpdateRoutineRequest;
+import com.pabom.backend.careguideline.presentation.request.PostponeRoutineRequest;
 import com.pabom.backend.global.error.BaseErrorCode;
 import com.pabom.backend.record.domain.error.RoutineErrorCode;
 import com.pabom.backend.record.domain.error.RecordErrorCode;
@@ -82,6 +87,7 @@ class CareGuidelinePr2IntegrationTest {
     @Autowired RoutineJpaRepository routines;
     @Autowired CareItemJpaRepository items;
     @Autowired CareGuidelineVersionJpaRepository versions;
+    @Autowired CareStandardJpaRepository standards;
     @Autowired ApplicableCareGuidelineService applicableGuidelines;
     @Autowired TodayQueryService todayQueryService;
     @Autowired RoutineCommandService routineCommandService;
@@ -193,6 +199,100 @@ class CareGuidelinePr2IntegrationTest {
         assertThat(ballPythonRoutines).containsKey("MIST")
                 .doesNotContainKeys("FEED_INSECT", "HUMID_HIDE", "MULTIVITAMIN");
         assertThat(ballPythonRoutines.get("MIST").getNextDueAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void synchronizesRoutinesWhenLifeStageActuallyChanges() {
+        LifeStage juvenile = stage("JUVENILE");
+        LifeStage adult = stage("ADULT");
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), juvenile.getId(), Certainty.CONFIRMED));
+        Map<String, Routine> before = routinesByCode(pet.id());
+        int routineCount = before.size();
+
+        UpdateRoutineRequest customFeed = new UpdateRoutineRequest();
+        customFeed.setIntervalDays(5);
+        customFeed.setIsEnabled(false);
+        routineCommandService.update(owner.getId(), before.get("FEED").getId(), customFeed);
+
+        UpdateRoutineRequest disableShedCheck = new UpdateRoutineRequest();
+        disableShedCheck.setIsEnabled(false);
+        routineCommandService.update(owner.getId(), before.get("SHED_CHECK").getId(), disableShedCheck);
+
+        PostponeRoutineRequest postponeWeight = new PostponeRoutineRequest();
+        postponeWeight.setPostponeTo(LocalDate.of(2026, 11, 5));
+        routineActionService.postpone(owner.getId(), before.get("WEIGHT").getId(), postponeWeight);
+        saveRecord(pet.id(), before.get("WATER"), NOW.minusSeconds(60), RecordType.DONE, null);
+
+        PetResult updated = petCommandService.update(owner.getId(), pet.id(), stagePatch(adult.getId()));
+        Map<String, Routine> after = routinesByCode(pet.id());
+
+        assertThat(updated.lifeStageId()).isEqualTo(adult.getId());
+        assertThat(after).hasSize(routineCount);
+        assertThat(after.get("FEED").getId()).isEqualTo(before.get("FEED").getId());
+        assertThat(after.get("FEED").getCycleSource()).isEqualTo(CycleSource.USER_CUSTOM);
+        assertThat(after.get("FEED").getIntervalDays()).isEqualTo(5);
+        assertThat(after.get("FEED").isActive()).isFalse();
+        assertThat(after.get("SHED_CHECK").isActive()).isFalse();
+        assertThat(after.get("MULTIVITAMIN").getIntervalDays()).isEqualTo(14);
+        assertThat(after.get("MULTIVITAMIN").getNextDueAt())
+                .isEqualTo(Instant.parse("2026-11-15T03:00:00Z"));
+        assertThat(after.get("WEIGHT").getIntervalDays()).isEqualTo(30);
+        assertThat(after.get("WEIGHT").getPostponedBaseDue()).isEqualTo(LocalDate.of(2026, 11, 1));
+        assertThat(after.get("WEIGHT").getNextDueAt())
+                .isEqualTo(Instant.parse("2026-11-05T03:00:00Z"));
+        assertThat(records.findAllByUserId(owner.getId())).hasSize(1);
+
+        assertThat(routineQueryService.get(owner.getId(), pet.id()))
+                .filteredOn(result -> result.careItemCode().equals("MULTIVITAMIN"))
+                .singleElement().satisfies(result -> {
+                    assertThat(result.intervalDays()).isEqualTo(14);
+                    assertThat(result.defaultCycleDays()).isEqualTo(14);
+                    assertThat(result.cycleSource()).isEqualTo(CycleSource.GUIDELINE);
+                });
+        assertThat(routineQueryService.get(owner.getId(), pet.id()))
+                .filteredOn(result -> result.careItemCode().equals("FEED"))
+                .singleElement().satisfies(result -> {
+                    assertThat(result.intervalDays()).isEqualTo(5);
+                    assertThat(result.defaultCycleDays()).isNull();
+                    assertThat(result.cycleSource()).isEqualTo(CycleSource.USER_CUSTOM);
+                });
+        assertThat(todayQueryService.get(owner.getId(), pet.id(), LocalDate.of(2026, 11, 15))
+                .pets().stream().flatMap(group -> group.tasks().stream()))
+                .filteredOn(task -> task.itemCode().equals("MULTIVITAMIN"))
+                .singleElement().extracting(task -> task.status())
+                .isEqualTo(TodayTaskStatus.DUE);
+
+        petCommandService.update(owner.getId(), pet.id(), stagePatch(adult.getId()));
+        assertThat(routines.findAllByPetIdOrderByIdAsc(pet.id())).hasSize(routineCount);
+    }
+
+    @Test
+    void createsOnlyNewlyApplicableRoutineWithoutDuplicatingExistingRoutines() {
+        LifeStage juvenile = stage("JUVENILE");
+        LifeStage adult = stage("ADULT");
+        CareGuidelineVersion version = versions.findByVersionLabel("1.2").orElseThrow();
+        CareItem memo = items.findByCode("MEMO").orElseThrow();
+        standards.save(CareStandard.of(version.getId(), leopard.getId(), adult.getId(), memo.getId(),
+                9, 7, 14, "OX", null, null, true,
+                "TEAM_JUDGMENT", "팀", "성체 전용 테스트 기준"));
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), juvenile.getId(), Certainty.CONFIRMED));
+        int juvenileRoutineCount = routines.findAllByPetIdOrderByIdAsc(pet.id()).size();
+
+        petCommandService.update(owner.getId(), pet.id(), stagePatch(adult.getId()));
+        List<Routine> adultRoutines = routines.findAllByPetIdOrderByIdAsc(pet.id());
+
+        assertThat(adultRoutines).hasSize(juvenileRoutineCount + 1);
+        assertThat(adultRoutines).filteredOn(routine -> routine.getCareItemId().equals(memo.getId()))
+                .singleElement().satisfies(routine -> {
+                    assertThat(routine.getIntervalDays()).isEqualTo(9);
+                    assertThat(routine.getCycleSource()).isEqualTo(CycleSource.GUIDELINE);
+                    assertThat(routine.isActive()).isTrue();
+                });
+
+        petCommandService.update(owner.getId(), pet.id(), stagePatch(adult.getId()));
+        assertThat(routines.findAllByPetIdOrderByIdAsc(pet.id())).hasSize(juvenileRoutineCount + 1);
     }
 
     @Test
@@ -537,6 +637,13 @@ class CareGuidelinePr2IntegrationTest {
 
     private CreatePetCommand command(UUID requestId, Long stageId, Certainty certainty) {
         return command(requestId, leopard.getId(), stageId, certainty);
+    }
+
+    private UpdatePetCommand stagePatch(Long stageId) {
+        return new UpdatePetCommand(
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent(), PatchValue.absent(),
+                PatchValue.absent(), PatchValue.of(stageId), PatchValue.absent(),
+                PatchValue.absent(), PatchValue.absent(), PatchValue.absent());
     }
 
     private CreateRecordRequest recordRequest(Long petId, String itemCode, FeedingOutcome outcome) {

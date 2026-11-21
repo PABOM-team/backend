@@ -19,6 +19,9 @@ import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.SPECIES
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.STAGE_REQUIRED;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_REQUEST;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.UPDATE_SUCCESS;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.APPLICABLE_GUIDELINE_NOT_FOUND;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.GUIDELINE_VERSION_CONFLICT;
+import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.CARE_STANDARD_DATA_MISSING;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.VALIDATION_FAILED;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.DELETE_INVALID_TOKEN;
 import static com.pabom.backend.pet.presentation.docs.PetOpenApiExamples.DELETE_PET_NOT_FOUND;
@@ -220,7 +223,7 @@ public class PetController {
     @PatchMapping("/{petId}")
     @Operation(
             summary = "내 개체 기본 정보 수정",
-            description = "생략한 필드는 유지합니다. morphIds 빈 배열은 전체 해제이며 customMorph, hatchedAt, adoptedAt, lifeStageId, photoFileId의 명시적 null은 해당 값을 삭제합니다.",
+            description = "생략한 필드는 유지합니다. morphIds 빈 배열은 전체 해제이며 customMorph, hatchedAt, adoptedAt, lifeStageId, photoFileId의 명시적 null은 해당 값을 삭제합니다. 성장 단계가 실제로 변경되면 현재 적용 가능한 가이드라인 기준으로 관리 루틴을 동기화하며 사용자 지정 주기와 활성화 상태는 유지합니다.",
             security = @SecurityRequirement(name = SwaggerConfig.AUTHORIZATION),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     required = true,
@@ -252,17 +255,25 @@ public class PetController {
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
                             examples = @ExampleObject(name = "INVALID_TOKEN", value = INVALID_TOKEN))),
-            @ApiResponse(responseCode = "404", description = "PET_NOT_FOUND. 타인 소유 개체도 동일하게 처리합니다.",
+            @ApiResponse(responseCode = "404", description = "개체 또는 적용 가능한 가이드라인 없음. 타인 소유 개체는 PET_NOT_FOUND로 처리합니다.",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
-                            examples = @ExampleObject(name = "PET_NOT_FOUND", value = PET_NOT_FOUND))),
+                            examples = {
+                                    @ExampleObject(name = "PET_NOT_FOUND", value = PET_NOT_FOUND),
+                                    @ExampleObject(name = "APPLICABLE_GUIDELINE_NOT_FOUND", value = APPLICABLE_GUIDELINE_NOT_FOUND)
+                            })),
             @ApiResponse(responseCode = "422", description = "성장 단계와 정확성의 최종 조합 검증 실패",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
                             examples = {
                                     @ExampleObject(name = "STAGE_REQUIRED", value = STAGE_REQUIRED),
-                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID)
-                            }))
+                                    @ExampleObject(name = "LIFE_STAGE_INVALID", value = LIFE_STAGE_INVALID),
+                                    @ExampleObject(name = "CARE_STANDARD_DATA_MISSING", value = CARE_STANDARD_DATA_MISSING)
+                            })),
+            @ApiResponse(responseCode = "409", description = "GUIDELINE_VERSION_CONFLICT",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = OpenApiSchemas.ErrorEnvelope.class),
+                            examples = @ExampleObject(name = "GUIDELINE_VERSION_CONFLICT", value = GUIDELINE_VERSION_CONFLICT)))
     })
     public ResponseEntity<ApiResponseBody<PetResponse>> update(
             @PathVariable Long petId,

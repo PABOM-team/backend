@@ -105,6 +105,18 @@ public class Routine {
         this.foodName = null;
         this.updatedAt = now;
     }
+    public void synchronizeGuideline(int intervalDays, Long guidelineVersionId,
+            LocalDate startDate, Instant nextDueAt, Instant now) {
+        this.intervalDays = intervalDays;
+        this.guidelineVersionId = guidelineVersionId;
+        this.startDate = startDate;
+        this.nextDueAt = nextDueAt;
+        this.updatedAt = now;
+    }
+    public void synchronizeGuidelineVersion(Long guidelineVersionId, Instant now) {
+        this.guidelineVersionId = guidelineVersionId;
+        this.updatedAt = now;
+    }
     public void updateFoodName(String foodName) { this.foodName = foodName; }
     public Long getId() { return id; }
     public Long getPetId() { return petId; }
