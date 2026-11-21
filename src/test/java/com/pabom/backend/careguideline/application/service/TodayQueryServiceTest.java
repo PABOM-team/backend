@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pabom.backend.careguideline.infrastructure.persistence.CareItemCodeMappingJpaRepository;
 import com.pabom.backend.pet.domain.repository.PetRepository;
 import com.pabom.backend.record.infrastructure.persistence.CareItemJpaRepository;
@@ -31,7 +32,8 @@ class TodayQueryServiceTest {
                 mock(CareRecordJpaRepository.class), mock(CareItemJpaRepository.class),
                 mock(CareItemCodeMappingJpaRepository.class), mock(SpeciesJpaRepository.class),
                 new RoutineDueDateCalculator(),
-                Clock.fixed(Instant.parse("2026-11-02T15:30:00Z"), ZoneOffset.UTC), environment);
+                Clock.fixed(Instant.parse("2026-11-02T15:30:00Z"), ZoneOffset.UTC), environment,
+                mock(PetRoutineQueryService.class), new ObjectMapper());
 
         assertThat(service.get(1L, null, LocalDate.of(2020, 1, 1)).date())
                 .isEqualTo(LocalDate.of(2026, 11, 3));

@@ -4,7 +4,7 @@ public final class RoutineOpenApiExamples {
     private RoutineOpenApiExamples() {}
 
     public static final String TODAY_SUCCESS = """
-            {"resultType":"SUCCESS","success":{"data":{"date":"2026-11-02","summary":{"dueCount":1,"overdueCount":1,"needsResultCount":0,"doneCount":0,"skippedCount":0,"reportCount":0},"emptyReason":null,"nextUpcoming":{"routineId":12,"petId":1,"itemCode":"CLEAN","dueDate":"2026-11-05"},"pets":[{"petId":1,"name":"레오","speciesCommonName":"레오파드 게코","photo":null,"stageNotice":null,"tasks":[{"routineId":10,"itemCode":"FEED","itemName":"급여","status":"OVERDUE","dueDate":"2026-11-01","originalDueDate":null,"overdueDays":1,"resultType":"FEED","unit":null,"lastRecord":null}]}]}},"error":null,"meta":{"timestamp":"2026-11-02T00:00:00","path":"/api/v1/today"}}
+            {"resultType":"SUCCESS","success":{"data":{"date":"2026-11-02","summary":{"dueCount":1,"overdueCount":1,"needsResultCount":0,"doneCount":0,"skippedCount":0,"reportCount":0},"emptyReason":null,"nextUpcoming":{"routineId":12,"petId":1,"itemCode":"CLEAN","dueDate":"2026-11-05"},"pets":[{"petId":1,"name":"레오","speciesCommonName":"레오파드 게코","photo":null,"stageNotice":null,"tasks":[{"routineId":10,"itemCode":"FEED","itemName":"급여","status":"OVERDUE","dueDate":"2026-11-01","originalDueDate":null,"overdueDays":1,"resultType":"FEED","unit":null,"foodName":"귀뚜라미","lastRecord":null}]}]}},"error":null,"meta":{"timestamp":"2026-11-02T00:00:00","path":"/api/v1/today"}}
             """;
     public static final String UPDATE_REQUEST = """
             {"intervalDays":5,"isEnabled":true,"startDate":"2026-11-05","reason":"PREFERENCE","reasonNote":"관리 주기를 조정하고 싶어요","foodName":"귀뚜라미"}

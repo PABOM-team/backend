@@ -6,6 +6,7 @@ import com.pabom.backend.auth.domain.model.OAuthProvider;
 import com.pabom.backend.careguideline.application.command.CareGuidelineImportFiles;
 import com.pabom.backend.careguideline.application.result.PetRoutineResult;
 import com.pabom.backend.careguideline.application.result.TodayEmptyReason;
+import com.pabom.backend.careguideline.application.result.TodayResult;
 import com.pabom.backend.careguideline.application.result.TodayTaskStatus;
 import com.pabom.backend.careguideline.domain.type.CareGuidelineImportMode;
 import com.pabom.backend.careguideline.domain.entity.CareGuidelineVersion;
@@ -528,6 +529,62 @@ class CareGuidelinePr2IntegrationTest {
     }
 
     @Test
+    void usesRecordedFoodNameOnlyForCompletedFeedingAndKeepsRoutineDefault() {
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), stage("JUVENILE").getId(), Certainty.CONFIRMED));
+        Routine feed = routinesByCode(pet.id()).get("FEED");
+        assertThat(routineQueryService.get(owner.getId(), pet.id()))
+                .filteredOn(result -> result.routineId().equals(feed.getId()))
+                .singleElement().extracting(PetRoutineResult::foodName).isEqualTo("귀뚜라미");
+
+        var detail = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()
+                .put("foodName", "인공 사료");
+        CreateRecordRequest create = new CreateRecordRequest(UUID.randomUUID(), pet.id(), "FEED",
+                OffsetDateTime.ofInstant(NOW.minusSeconds(60), ZoneOffset.UTC), TimePrecision.EXACT,
+                FeedingOutcome.ATE_ALL, null, detail, null, null, null);
+        var created = recordService.create(owner.getId(), create);
+
+        assertThat(created.record().detail().path("foodName").asText()).isEqualTo("인공 사료");
+        assertThat(recordService.get(owner.getId(), created.record().id()).record().detail()
+                .path("foodName").asText()).isEqualTo("인공 사료");
+        assertThat(todayTask(owner.getId(), pet.id(), LocalDate.of(2026, 11, 1), feed.getId()).foodName())
+                .isEqualTo("인공 사료");
+
+        UpdateRecordRequest update = new UpdateRecordRequest();
+        update.setRevisionNo(created.record().revisionNo());
+        update.setDetail(new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()
+                .put("foodName", "밀웜"));
+        var updated = recordService.update(owner.getId(), created.record().id(), update);
+
+        assertThat(updated.record().detail().path("foodName").asText()).isEqualTo("밀웜");
+        assertThat(todayTask(owner.getId(), pet.id(), LocalDate.of(2026, 11, 1), feed.getId()).foodName())
+                .isEqualTo("밀웜");
+        assertThat(recordService.get(owner.getId(), created.record().id()).revisions())
+                .singleElement().satisfies(revision -> {
+                    assertThat(revision.changeType()).isEqualTo(
+                            com.pabom.backend.record.domain.type.RevisionChangeType.EDIT);
+                    assertThat(revision.changedFields()).containsExactly("detail");
+                });
+        assertThat(routines.findById(feed.getId()).orElseThrow().getFoodName()).isNull();
+        assertThat(routineQueryService.get(owner.getId(), pet.id()))
+                .filteredOn(result -> result.routineId().equals(feed.getId()))
+                .singleElement().extracting(PetRoutineResult::foodName).isEqualTo("귀뚜라미");
+        assertThat(todayTask(owner.getId(), pet.id(), LocalDate.of(2026, 11, 2), feed.getId()).foodName())
+                .isEqualTo("귀뚜라미");
+    }
+
+    @Test
+    void fallsBackToDefaultFoodNameForLegacyCompletedRecordWithoutDetail() {
+        PetResult pet = petCommandService.create(owner.getId(),
+                command(UUID.randomUUID(), stage("JUVENILE").getId(), Certainty.CONFIRMED));
+        Routine feed = routinesByCode(pet.id()).get("FEED");
+        saveRecord(pet.id(), feed, NOW.minusSeconds(60), RecordType.DONE, FeedingOutcome.ATE_ALL);
+
+        assertThat(todayTask(owner.getId(), pet.id(), LocalDate.of(2026, 11, 1), feed.getId()).foodName())
+                .isEqualTo("귀뚜라미");
+    }
+
+    @Test
     void customizesCycleStartDateAndActivatesDefaultDisabledRoutine() {
         Species crested = species.findByCode("CRESTED").orElseThrow();
         PetResult pet = petCommandService.create(owner.getId(),
@@ -650,6 +707,13 @@ class CareGuidelinePr2IntegrationTest {
         return new CreateRecordRequest(UUID.randomUUID(), petId, itemCode,
                 OffsetDateTime.ofInstant(NOW.minusSeconds(60), ZoneOffset.UTC),
                 TimePrecision.EXACT, outcome, null, null, null, null, null);
+    }
+
+    private TodayResult.Task todayTask(Long userId, Long petId, LocalDate date, Long routineId) {
+        return todayQueryService.get(userId, petId, date).pets().stream()
+                .flatMap(group -> group.tasks().stream())
+                .filter(task -> task.routineId().equals(routineId))
+                .findFirst().orElseThrow();
     }
 
     private void assertError(org.assertj.core.api.ThrowableAssert.ThrowingCallable action,

@@ -1,6 +1,10 @@
 package com.pabom.backend.careguideline.application.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pabom.backend.careguideline.application.result.TodayEmptyReason;
+import com.pabom.backend.careguideline.application.result.PetRoutineResult;
 import com.pabom.backend.careguideline.application.result.TodayResult;
 import com.pabom.backend.careguideline.application.result.TodayTaskStatus;
 import com.pabom.backend.careguideline.domain.entity.CareItemCodeMapping;
@@ -56,6 +60,8 @@ public class TodayQueryService {
     private final RoutineDueDateCalculator dueDates;
     private final Clock clock;
     private final Environment environment;
+    private final PetRoutineQueryService petRoutineQueryService;
+    private final ObjectMapper objectMapper;
 
     public TodayResult get(Long userId, Long petId, LocalDate requestedDate) {
         return build(userId, petId, resolveDate(requestedDate));
@@ -87,6 +93,10 @@ public class TodayQueryService {
         }
 
         ItemContext itemContext = itemContext(activeRoutines);
+        Map<Long, String> defaultFoodNameByRoutine = ownedPets.stream()
+                .flatMap(pet -> petRoutineQueryService.get(userId, pet.getId()).stream())
+                .filter(result -> result.foodName() != null && !result.foodName().isBlank())
+                .collect(Collectors.toMap(PetRoutineResult::routineId, PetRoutineResult::foodName));
         Map<Long, Species> speciesById = species.findAllById(
                         ownedPets.stream().map(Pet::getSpeciesId).distinct().toList()).stream()
                 .collect(Collectors.toMap(Species::getId, Function.identity()));
@@ -137,7 +147,8 @@ public class TodayQueryService {
             tasksByPet.computeIfAbsent(routine.getPetId(), ignored -> new ArrayList<>()).add(
                     new TodayResult.Task(routine.getId(), code, item.getName(), status, taskDueDate,
                             routine.getPostponedBaseDue(), overdueDays, item.getGuidelineRecordType(),
-                            item.getUnit(), lastRecord(last, item)));
+                            item.getUnit(), foodName(code, routine, todayRecord, defaultFoodNameByRoutine),
+                            lastRecord(last, item)));
         }
 
         Comparator<TodayResult.Task> taskOrder = Comparator
@@ -209,6 +220,29 @@ public class TodayQueryService {
         return new TodayResult.LastRecord(record.getId(), record.getRecordType(),
                 OffsetDateTime.ofInstant(record.getOccurredAt(), RoutineDueDateCalculator.SERVICE_ZONE),
                 record.getOutcome(), record.getValueNum(), item.getUnit());
+    }
+
+    private String foodName(String itemCode, Routine routine, CareRecord todayRecord,
+            Map<Long, String> defaultFoodNameByRoutine) {
+        String fallback = routine.getFoodName() != null && !routine.getFoodName().isBlank()
+                ? routine.getFoodName() : defaultFoodNameByRoutine.get(routine.getId());
+        if (!Set.of("FEED", "FEEDING").contains(itemCode) || todayRecord == null
+                || todayRecord.getRecordType() != RecordType.DONE) return fallback;
+        String recordedFoodName = recordedFoodName(todayRecord);
+        return recordedFoodName == null ? fallback : recordedFoodName;
+    }
+
+    private String recordedFoodName(CareRecord record) {
+        if (record.getDetailJson() == null) return null;
+        try {
+            JsonNode detail = objectMapper.readTree(record.getDetailJson());
+            if (detail == null) return null;
+            JsonNode foodName = detail.get("foodName");
+            if (foodName == null || !foodName.isTextual() || foodName.asText().isBlank()) return null;
+            return foodName.asText();
+        } catch (JsonProcessingException exception) {
+            return null;
+        }
     }
 
     private CareRecord laterRecord(CareRecord left, CareRecord right) {

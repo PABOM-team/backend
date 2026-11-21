@@ -28,7 +28,10 @@ public record TodayResult(
     @Schema(name = "TodayTask")
     public record Task(Long routineId, String itemCode, String itemName,
             TodayTaskStatus status, LocalDate dueDate, LocalDate originalDueDate, Integer overdueDays,
-            String resultType, String unit, LastRecord lastRecord) {}
+            String resultType, String unit,
+            @Schema(nullable = true, description = "급여 먹이 이름. 완료 기록은 기록 detail.foodName, 루틴, 가이드라인 기본값 순으로 반환")
+            String foodName,
+            LastRecord lastRecord) {}
 
     public record LastRecord(Long recordId, RecordType recordType, OffsetDateTime occurredAt,
             FeedingOutcome outcome, BigDecimal value, String unit) {}

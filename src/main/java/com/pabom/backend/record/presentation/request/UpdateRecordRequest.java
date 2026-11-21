@@ -15,7 +15,7 @@ public class UpdateRecordRequest {
     @NotNull @Positive @Schema(requiredMode = Schema.RequiredMode.REQUIRED) private Integer revisionNo;
     private OffsetDateTime occurredAt; private TimePrecision timePrecision; private FeedingOutcome outcome;
     private BigDecimal valueNum; private JsonNode detail;
-    @Size(max = 500) private String memo; @Positive private Long photoFileId;
+    @Size(max = 200) private String memo; @Positive private Long photoFileId;
     private final Set<String> present = new HashSet<>();
     private final Set<String> notEditable = new HashSet<>();
 
@@ -31,7 +31,8 @@ public class UpdateRecordRequest {
     public void setValueNum(BigDecimal value) { valueNum = value; present.add("valueNum"); }
     @Schema(nullable = true) public JsonNode getDetail() { return detail; }
     public void setDetail(JsonNode value) { detail = value; present.add("detail"); }
-    @Schema(nullable = true, maxLength = 500) public String getMemo() { return memo; }
+    @Schema(nullable = true, maxLength = 200, description = "메모(최대 200자)")
+    public String getMemo() { return memo; }
     public void setMemo(String value) { memo = value; present.add("memo"); }
     @Schema(nullable = true) public Long getPhotoFileId() { return photoFileId; }
     public void setPhotoFileId(Long value) { photoFileId = value; present.add("photoFileId"); }

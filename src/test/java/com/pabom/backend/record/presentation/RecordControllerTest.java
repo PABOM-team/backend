@@ -50,6 +50,27 @@ class RecordControllerTest {
         mvc.perform(get("/api/v1/records?size=51")).andExpect(status().isBadRequest());
     }
 
+    @Test void acceptsTwoHundredCharacterMemoAndRejectsTwoHundredOneCharacters() throws Exception {
+        String twoHundred = "가".repeat(200);
+        String twoHundredOne = "가".repeat(201);
+
+        mvc.perform(post("/api/v1/records").contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(twoHundred)))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/v1/records").contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(twoHundredOne)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mvc.perform(post("/api/v1/records").contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody("MEMO", twoHundredOne)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+        mvc.perform(patch("/api/v1/records/1").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"revisionNo\":1,\"memo\":\"" + twoHundredOne + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+    }
+
     @Test void hidesOtherUsersRecordsAs404() throws Exception {
         given(service.get(7L,99L)).willThrow(new BusinessException(RecordErrorCode.RECORD_NOT_FOUND));
         mvc.perform(get("/api/v1/records/99")).andExpect(status().isNotFound())
@@ -65,4 +86,11 @@ class RecordControllerTest {
     private String createBody() { return """
         {"clientRequestId":"a1b2c3d4-e5f6-47a8-9012-123456789abc","petId":12,"itemCode":"FEEDING","occurredAt":"2026-10-20T10:00:00+09:00"}
         """; }
+    private String createBody(String memo) {
+        return createBody("FEEDING", memo);
+    }
+    private String createBody(String itemCode, String memo) {
+        return createBody().trim().replace("FEEDING", itemCode)
+                .replace("}", ",\"memo\":\"" + memo + "\"}");
+    }
 }
